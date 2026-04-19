@@ -45,6 +45,8 @@ export const ConfigSidebar = ({ config, onChange, onRebuildIndex }: ConfigSideba
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="qwen2.5:3b">qwen2.5:3b · originale</SelectItem>
+            <SelectItem value="llama3.1:latest">llama3.1 · locale</SelectItem>
             <SelectItem value="llama3.1:8b">llama3.1:8b · generale</SelectItem>
             <SelectItem value="mistral:7b">mistral:7b · veloce</SelectItem>
             <SelectItem value="qwen2.5:14b">qwen2.5:14b · accurato</SelectItem>

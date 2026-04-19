@@ -10,6 +10,8 @@ export interface RetrievedSource {
   reference: string;
   page: number;
   score: number;
+  denseScore?: number;
+  keywordScore?: number;
   excerpt: string;
 }
 
@@ -20,6 +22,9 @@ export interface AnswerData {
   sources: RetrievedSource[];
   generatedAt: string;
   model: string;
+  noAnswer?: boolean;
+  reason?: string | null;
+  durationMs?: number;
 }
 
 interface AnswerPanelProps {
@@ -61,7 +66,16 @@ export const AnswerPanel = ({ data }: AnswerPanelProps) => {
         </header>
 
         <div className="px-5 py-5">
-          {data.confidence === "low" && (
+          {data.noAnswer && (
+            <div className="mb-4 flex items-start gap-3 rounded-md border border-warning/30 bg-warning/5 p-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <p className="text-xs leading-relaxed text-foreground">
+                Il backend ha restituito una risposta di insufficienza informativa: il retrieval non ha superato la soglia minima di affidabilità.
+              </p>
+            </div>
+          )}
+
+          {!data.noAnswer && data.confidence === "low" && (
             <div className="mb-4 flex items-start gap-3 rounded-md border border-warning/30 bg-warning/5 p-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <p className="text-xs leading-relaxed text-foreground">
@@ -84,6 +98,12 @@ export const AnswerPanel = ({ data }: AnswerPanelProps) => {
               <span>{data.sources.length} fonti utilizzate</span>
               <span className="h-3 w-px bg-border" />
               <span>{data.generatedAt}</span>
+              {typeof data.durationMs === "number" && (
+                <>
+                  <span className="h-3 w-px bg-border" />
+                  <span>{(data.durationMs / 1000).toFixed(1)}s</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleExport("PDF")}>
@@ -142,6 +162,12 @@ export const AnswerPanel = ({ data }: AnswerPanelProps) => {
                         />
                       </div>
                       <span className="font-mono">{(src.score * 100).toFixed(0)}%</span>
+                      {typeof src.denseScore === "number" && (
+                        <span className="font-mono">dense {(src.denseScore * 100).toFixed(0)}%</span>
+                      )}
+                      {typeof src.keywordScore === "number" && (
+                        <span className="font-mono">kw {(src.keywordScore * 100).toFixed(0)}%</span>
+                      )}
                     </div>
                   </div>
                   <ChevronDown className={cn("mt-1 h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />

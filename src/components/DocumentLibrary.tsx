@@ -16,6 +16,7 @@ interface DocumentLibraryProps {
   docs: KnowledgeDoc[];
   onImport: () => void;
   onDownload: () => void;
+  downloadLabel?: string;
 }
 
 const statusMeta = {
@@ -24,7 +25,7 @@ const statusMeta = {
   error: { label: "Errore", tone: "text-destructive bg-destructive/10 border-destructive/25", icon: FileText },
 };
 
-export const DocumentLibrary = ({ docs, onImport, onDownload }: DocumentLibraryProps) => {
+export const DocumentLibrary = ({ docs, onImport, onDownload, downloadLabel = "Scarica preset" }: DocumentLibraryProps) => {
   return (
     <section className="panel overflow-hidden">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
@@ -36,7 +37,7 @@ export const DocumentLibrary = ({ docs, onImport, onDownload }: DocumentLibraryP
         </div>
         <div className="flex items-center gap-1.5">
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onDownload}>
-            <Download className="h-3.5 w-3.5" /> Scarica preset
+            <Download className="h-3.5 w-3.5" /> {downloadLabel}
           </Button>
           <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={onImport}>
             <Upload className="h-3.5 w-3.5" /> Importa PDF

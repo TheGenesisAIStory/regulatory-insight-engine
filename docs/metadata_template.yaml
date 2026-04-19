@@ -1,0 +1,10 @@
+title: ""
+source: "" # EBA | Banca d'Italia | Intesa Sanpaolo | ...
+jurisdiction: "" # IT | EU
+regulator: "" # EBA | Banca d'Italia | --
+doc_type: "" # regulation | guidance | circular | pillar3 | annual_report | ifrs_policy
+date: "" # YYYY-MM-DD
+bank: "" # se applicabile
+language: "it"
+id: "" # identificatore interno opzionale
+tags: []

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileStack, Layers, Cpu, Database, PanelLeftClose, PanelLeft } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { ConfigSidebar, AssistantConfig } from "@/components/ConfigSidebar";
@@ -10,12 +10,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { DocumentLibrary } from "@/components/DocumentLibrary";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { mockDocs, mockAnswer } from "@/data/mockData";
+import { mockDocs } from "@/data/mockData";
 import { toast } from "@/hooks/use-toast";
+import { API_BASE_URL, askGenisia, GenisiaApiError, getDocuments, getReadiness, HealthResponse, rebuildIndex } from "@/lib/genisiaApi";
 
 const Index = () => {
   const [config, setConfig] = useState<AssistantConfig>({
-    model: "llama3.1:8b",
+    model: "qwen2.5:3b",
     topK: 5,
     chunkSize: 768,
     overlap: 120,
@@ -24,36 +25,117 @@ const Index = () => {
   const [answer, setAnswer] = useState<AnswerData | null>(null);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [apiDocs, setApiDocs] = useState(mockDocs);
+  const [apiChecked, setApiChecked] = useState(false);
+  const [readinessReasons, setReadinessReasons] = useState<string[]>([]);
 
-  const indexedDocs = mockDocs.filter((d) => d.status === "indexed");
+  const apiOnline = Boolean(health?.ollamaOnline);
+  const usingRealDocs = apiDocs !== mockDocs;
+  const indexedDocs = apiDocs.filter((d) => d.status === "indexed");
   const totalChunks = indexedDocs.reduce((acc, d) => acc + d.chunks, 0);
 
-  const handleAsk = (q: string) => {
+  useEffect(() => {
+    let mounted = true;
+
+    const loadRuntimeState = async () => {
+      try {
+        const [readiness, docs] = await Promise.all([getReadiness(), getDocuments()]);
+        if (!mounted) return;
+        const healthData = readiness.status;
+        setHealth(healthData);
+        setReadinessReasons(readiness.reasons);
+        const chatModel = healthData.activeChatModel ?? healthData.availableModels.find((model) => !model.toLowerCase().includes("embed"));
+        if (chatModel) {
+          setConfig((current) => ({
+            ...current,
+            model: healthData.availableModels.includes(current.model) ? current.model : chatModel,
+          }));
+        }
+        if (docs.length > 0) {
+          setApiDocs(docs);
+        }
+      } catch (error) {
+        if (!mounted) return;
+        setHealth(null);
+        setReadinessReasons([]);
+        const message = error instanceof GenisiaApiError ? `${error.message} (${error.status})` : `Avvia il backend su ${API_BASE_URL}.`;
+        toast({
+          title: "API RAG non raggiungibile",
+          description: `${message} La libreria documentale resta in modalita' dimostrativa.`,
+          variant: "destructive",
+        });
+      } finally {
+        if (mounted) {
+          setApiChecked(true);
+        }
+      }
+    };
+
+    loadRuntimeState();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleAsk = async (q: string) => {
     setLoading(true);
     setAnswer(null);
-    setTimeout(() => {
-      setAnswer(mockAnswer(q));
+
+    try {
+      const data = await askGenisia(q, config.topK, config.model);
+      setAnswer(data);
+    } catch (error) {
+      const message = error instanceof GenisiaApiError ? `${error.message} (HTTP ${error.status})` : error instanceof Error ? error.message : "Errore sconosciuto";
+      toast({
+        title: "Interrogazione non riuscita",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    }, 1400);
+    }
   };
 
-  const handleRebuild = () => {
-    toast({
-      title: "Ricostruzione indice avviata",
-      description: "L'operazione viene eseguita in background. Riceverai una notifica al completamento.",
-    });
+  const handleRebuild = async () => {
+    setLoading(true);
+    try {
+      const result = await rebuildIndex();
+      const docs = await getDocuments();
+      setHealth(result.status);
+      if (docs.length > 0) {
+        setApiDocs(docs);
+      }
+      toast({
+        title: "Indice ricostruito",
+        description: `${result.status.chunks.toLocaleString()} chunk indicizzati dal motore RAG locale.`,
+      });
+    } catch (error) {
+      const message = error instanceof GenisiaApiError ? `${error.message} (HTTP ${error.status})` : error instanceof Error ? error.message : "Errore sconosciuto";
+      toast({
+        title: "Ricostruzione indice non riuscita",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const setupSteps = [
-    { label: "Verifica runtime locale", description: "Modello LLM e servizio embeddings raggiungibili.", done: true },
-    { label: "Carica documenti normativi", description: "Importa PDF di IFRS 9, CRR e linee guida EBA.", done: indexedDocs.length > 0 },
-    { label: "Costruisci indice vettoriale", description: "Chunking, embedding e persistenza dell'indice.", done: totalChunks > 0 },
+    { label: "Verifica runtime locale", description: readinessReasons[0] ?? `API RAG ${API_BASE_URL} e Ollama raggiungibili.`, done: apiOnline },
+    { label: "Carica documenti normativi", description: "Importa PDF di IFRS 9, CRR, Basel e Banca d'Italia.", done: indexedDocs.length > 0 },
+    { label: "Costruisci indice vettoriale", description: "Chunking, embedding e persistenza dell'indice.", done: Boolean(health?.ready) || totalChunks > 0 },
     { label: "Configura parametri di recupero", description: "Top-K, dimensione chunk e modalità rapida.", done: true },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader modelStatus="online" indexStatus="online" />
+      <AppHeader
+        modelStatus={!apiChecked ? "loading" : apiOnline ? "online" : "offline"}
+        indexStatus={!apiChecked ? "warning" : health?.ready ? "online" : usingRealDocs ? "warning" : "offline"}
+      />
 
       <div className="mx-auto flex max-w-[1600px]">
         {/* Desktop sidebar */}
@@ -110,27 +192,27 @@ const Index = () => {
               icon={FileStack}
               label="Documenti indicizzati"
               value={indexedDocs.length}
-              hint={`su ${mockDocs.length} totali`}
+              hint={`su ${apiDocs.length} totali`}
               tone="info"
             />
             <MetricCard
               icon={Layers}
               label="Chunk indicizzati"
               value={totalChunks.toLocaleString()}
-              hint={`chunk size ${config.chunkSize}`}
+              hint={health?.ready ? "indice reale pronto" : `chunk size ${config.chunkSize}`}
             />
             <MetricCard
               icon={Cpu}
               label="Modello attivo"
-              value={config.model}
-              hint={config.fastMode ? "modalità rapida" : "modalità standard"}
+              value={health?.activeChatModel ?? config.model}
+              hint={apiOnline ? "Ollama online" : "API non collegata"}
               tone="success"
             />
             <MetricCard
               icon={Database}
               label="Top-K retrieval"
               value={config.topK}
-              hint={`overlap ${config.overlap}`}
+              hint={health?.embedModel ? `embedding ${health.embedModel}` : `overlap ${config.overlap}`}
             />
           </div>
 
@@ -159,9 +241,10 @@ const Index = () => {
               </span>
             </div>
             <DocumentLibrary
-              docs={mockDocs}
-              onImport={() => toast({ title: "Importazione PDF", description: "Seleziona uno o più documenti normativi da indicizzare." })}
-              onDownload={() => toast({ title: "Download preset", description: "Pacchetto IFRS 9 + CRR scaricato dall'archivio interno." })}
+              docs={apiDocs}
+              onImport={() => toast({ title: "Importazione PDF", description: "Aggiungi PDF nella cartella normativa del motore RAG e ricostruisci l'indice." })}
+              onDownload={handleRebuild}
+              downloadLabel="Ricostruisci indice"
             />
           </div>
 

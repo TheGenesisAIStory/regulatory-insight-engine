@@ -1,0 +1,10 @@
+{
+  "dataset_path": "backend/eval/supervised_seed.cleaned.jsonl",
+  "output_dir": "training/data/output",
+  "model_base_name": "local-base-model",
+  "train_val_split": 0.9,
+  "max_samples": null,
+  "seed": 42,
+  "skip_no_answer": true,
+  "instruction_style": "alpaca"
+}

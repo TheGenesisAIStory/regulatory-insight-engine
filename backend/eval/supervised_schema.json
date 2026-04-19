@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Supervised domain dataset schema",
+  "type": "object",
+  "required": ["id", "category", "input", "target", "example_type", "language"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique example identifier" },
+    "category": { "type": "string", "description": "High-level domain, e.g. ifrs9, crr, banca_ditalia, banks, eba" },
+    "subcategory": { "type": "string", "description": "Optional finer-grained tag, e.g. sicr, pillar3" },
+    "input": { "type": "string", "description": "User query or input text" },
+    "target": { "type": "string", "description": "Expected (supervised) answer or label. Empty string allowed for no-answer examples" },
+    "expected_sources": { "type": "array", "items": { "type": "string" }, "description": "List of source filenames or identifiers used as provenance" },
+    "rationale": { "type": "string", "description": "Optional short rationale for the annotation" },
+    "language": { "type": "string", "description": "Language code, e.g. it or en" },
+    "example_type": { "type": "string", "enum": ["factual_qa", "definitional_qa", "comparison_qa", "no_answer", "classification", "source_grounded"], "description": "Type of supervised example" }
+  },
+  "additionalProperties": false
+}
