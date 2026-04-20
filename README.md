@@ -258,6 +258,27 @@ Modalita' supportate:
 
 `DOMAIN_GATE_TERMS_PATH` puo' puntare a un JSON locale con `allow_terms`, `deny_terms`, `extra_allow_terms` ed `extra_deny_terms`.
 
+### Index initialization (after checkout)
+
+After cloning the repository and installing dependencies, initialize the retrieval index before first use. With the backend server running (see "Avvia l'API" above), run:
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8000/index/rebuild" \
+  -H "Content-Type: application/json" \
+  -d '{"download": false}'
+```
+
+Recommendation: set the runtime answer threshold to reduce false positives:
+
+```bash
+# export for current shell session
+export SCORE_THRESHOLD=0.30
+# or start the API with the recommended threshold
+SCORE_THRESHOLD=0.30 uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+```
+
+This ensures the local PDF corpus is chunked and embedded and that `/ready` reports `true` before running evaluation or serving traffic.
+
 ## Script disponibili
 
 ```bash
