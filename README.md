@@ -1,10 +1,19 @@
 # regulatory-insight-engine
-A lightweight prototype RAG system focused on regulatory CRR and IFRS9 content.
 
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
-A prototype RAG system focused on regulatory CRR and IFRS9 content, designed to be offline-first and auditable.
 
-Quick links
+A lightweight offline-first RAG prototype for CRR, IFRS 9, Banca d'Italia and Italian banking regulatory analysis. It combines a React UI, a local FastAPI backend, Ollama embeddings/generation, evaluation tooling and corpus organization runbooks.
+
+**Beta status:** `v0.1.0-beta` is ready for local experimentation and evaluation. It is not production-ready legal, accounting or regulatory advice. On a fresh clone, `/ready` is expected to be `false` until you provide a coherent document corpus and embeddings cache, or rebuild embeddings locally.
+
+Recommended beta runtime posture:
+
+- keep everything local/offline-first;
+- enable `ENABLE_DOMAIN_GATE=true` with `DOMAIN_GATE_MODE=hybrid`;
+- use `SCORE_THRESHOLD=0.30` as the current safer baseline from local evaluation;
+- validate your corpus with the benchmark before trusting changes.
+
+Quick links:
  - Runtime runbook: [docs/RUNTIME_RAG.md](docs/RUNTIME_RAG.md)
  - Evaluation: [docs/EVALUATION.md](docs/EVALUATION.md)
  - Supervised dataset: [docs/DOMAIN_DATASET.md](docs/DOMAIN_DATASET.md)
@@ -12,27 +21,26 @@ Quick links
  - Validation checklist: [docs/CHECKLIST.md](docs/CHECKLIST.md)
  - Production vs experimental: [docs/PRODUCTION_EXPERIMENTAL.md](docs/PRODUCTION_EXPERIMENTAL.md)
 
-Architecture (high level)
+Architecture (high level):
  - Frontend: React + Vite (UI, `src/`) — collects queries and renders answers.
  - Backend: FastAPI (`backend/api.py`) — exposes `POST /ask`, `POST /index/rebuild`, health and readiness endpoints.
  - RAG engine: `backend/genisia_rag_engine.py` — chunking, embedding (Ollama), retrieval, scoring (dense + keyword), domain gate, no-answer logic.
  - Local model server: Ollama — used for embeddings and generation; kept local (no cloud required).
  - Evaluation: `backend/eval/` contains dataset, validator, benchmarking and tuning scripts.
 
-Setup (developer quickstart)
-1. Frontend
+Setup (developer quickstart):
+1. Frontend, from the repository root:
 ```bash
-cd src
 npm install
 npm run dev
 ```
-2. Backend
+2. Backend, from the `backend/` directory:
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn backend.api:app --reload --port 8000
+uvicorn api:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Evaluation and calibration
@@ -84,6 +92,8 @@ L'applicazione e' pensata per team di risk management, compliance, audit e regol
 
 > Stato attuale: la UI React chiama l'API locale FastAPI inclusa in `backend/`. Se l'API non e' avviata, la libreria documentale mostra ancora dati dimostrativi come fallback visivo, ma le interrogazioni non vengono piu' risolte con risposte mock.
 
+> Limite beta importante: il repository non pubblica una cache embeddings pronta. Un nuovo clone deve preparare il corpus/cache oppure lanciare un rebuild locale, che puo' essere lento. Finche' questo passaggio non e' completato, `GET /ready` puo' rispondere `ready: false`.
+
 ## Stack tecnico
 
 - React 18
@@ -116,14 +126,14 @@ Il repository contiene sia `package-lock.json` sia lockfile Bun. Scegli un solo 
 
 ### Frontend React
 
-Con npm:
+Con npm, dalla root del repository:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Con Bun:
+Con Bun, dalla root del repository:
 
 ```bash
 bun install
@@ -169,7 +179,7 @@ pip install -r requirements.txt
 Avvia l'API:
 
 ```bash
-uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+uvicorn api:app --reload --host 127.0.0.1 --port 8000
 ```
 
 By default the API uses repository-relative paths so the project is portable after cloning.
@@ -213,14 +223,14 @@ DOMAIN_GATE_MODE=hybrid
 DOMAIN_GATE_TERMS_PATH=
 ```
 
-Esempio (dal repository root):
+Esempio dalla root del repository:
 
 ```bash
 OLLAMA_HOST=http://localhost:11434 \
 LLM_MODEL=qwen2.5:3b \
 DOCS_PATH=./docs \
 CACHE_PATH=./backend/cache/embeddings_cache.pkl \
-uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+uvicorn api:app --app-dir backend --reload --host 127.0.0.1 --port 8000
 ```
 
 ### Domain gate runtime opzionale
@@ -228,7 +238,8 @@ uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
 Il comportamento score-only resta disponibile e disattivato di default:
 
 ```bash
-ENABLE_DOMAIN_GATE=false uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+cd backend
+ENABLE_DOMAIN_GATE=false uvicorn api:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Per testare nel flusso reale la policy score + domain gate:
@@ -239,7 +250,7 @@ source .venv/bin/activate
 ENABLE_DOMAIN_GATE=true \
 DOMAIN_GATE_MODE=hybrid \
 SCORE_THRESHOLD=0.30 \
-uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+uvicorn api:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Modalita' supportate:
@@ -268,10 +279,10 @@ Option B — rebuild the index (recommended when you don't have a cache):
 # start Ollama in one terminal
 # ollama serve
 
-# start backend in another terminal (from repo root)
+# start backend in another terminal
 cd backend
 source .venv/bin/activate
-uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+uvicorn api:app --reload --host 127.0.0.1 --port 8000
 
 # trigger index build (new shell)
 curl -sS -X POST "http://127.0.0.1:8000/index/rebuild" \
@@ -282,7 +293,17 @@ curl -sS -X POST "http://127.0.0.1:8000/index/rebuild" \
 If your document corpus lives outside the repository, set the `DOCS_PATH` environment variable to point to your local folder before starting the API:
 
 ```bash
-DOCS_PATH=/absolute/path/to/your/docs uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+cd backend
+DOCS_PATH=/absolute/path/to/your/docs uvicorn api:app --reload --host 127.0.0.1 --port 8000
+```
+
+If you also reuse an existing embeddings cache from that external corpus, set `RAG_BASE_DIR` consistently with the original corpus path so cache fingerprinting does not force a slow rebuild:
+
+```bash
+RAG_BASE_DIR=/absolute/path/to/rag-banca \
+DOCS_PATH=/absolute/path/to/rag-banca/normativa \
+CACHE_PATH=/absolute/path/to/rag-banca/genisia_embeddings_cache.pkl \
+uvicorn api:app --app-dir backend --reload --host 127.0.0.1 --port 8000
 ```
 
 Recommendation: set `SCORE_THRESHOLD=0.30` in your environment to reduce false positive answers in typical setups:
@@ -431,7 +452,7 @@ CHUNK_WORDS = 420
 CHUNK_OVERLAP = 80
 BATCH_SIZE = 20
 MAX_EMBED_CHARS = 1800
-MIN_SCORE_TO_ANSWER = 0.12
+SCORE_THRESHOLD = 0.12
 ```
 
 Le categorie indicizzate di default sono:
@@ -707,4 +728,4 @@ npm run preview
 
 ## Licenza
 
-Licenza non specificata. Aggiornare questa sezione prima della distribuzione pubblica o aziendale.
+MIT. Vedi [LICENSE](LICENSE).

@@ -17,7 +17,7 @@ Limits and known risks
 - Re-embedding cost: changing chunk parameters requires recomputing embeddings which is time and resource intensive.
 
 No-answer policy (summary)
-- Abstain when evidence is insufficient (score < `MIN_SCORE_TO_ANSWER`), domain gate fails, or `min_score_gap` indicates low confidence.
+- Abstain when evidence is insufficient (score < `SCORE_THRESHOLD`), domain gate fails, or `min_score_gap` indicates low confidence.
 - This conservative policy prioritizes safety over coverage for regulated use-cases.
 
 Residual risks (must be acknowledged)

@@ -20,15 +20,24 @@ pip install -r backend/requirements.txt
 3. Set environment variables (example):
 ```bash
 export DOCS_PATH=$(pwd)/docs
-export CACHE_PATH=$(pwd)/genisia_embeddings_cache.pkl
+export CACHE_PATH=$(pwd)/backend/cache/embeddings_cache.pkl
 export ENABLE_DOMAIN_GATE=true
 export DOMAIN_GATE_MODE=hybrid
-export DOMAIN_GATE_TERMS_PATH=$(pwd)/backend/domain_terms.json
-export MIN_SCORE_TO_ANSWER=0.12
+export SCORE_THRESHOLD=0.30
 ```
+
+If you reuse a cache built in another local corpus directory, keep `RAG_BASE_DIR`, `DOCS_PATH`, and `CACHE_PATH` aligned with that corpus so cache fingerprinting can match:
+
+```bash
+export RAG_BASE_DIR=/absolute/path/to/rag-banca
+export DOCS_PATH=/absolute/path/to/rag-banca/normativa
+export CACHE_PATH=/absolute/path/to/rag-banca/genisia_embeddings_cache.pkl
+```
+
 4. Run the backend:
 ```bash
-uvicorn backend.api:app --reload --port 8000
+cd backend
+uvicorn api:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Health & admin endpoints
@@ -40,7 +49,7 @@ Health & admin endpoints
 Indexing and caches
 - Embeddings are fingerprinted on chunk parameters; changing `CHUNK_SIZE`, `CHUNK_OVERLAP` or embedding model requires cache rebuild.
 - To rebuild:
-  - call `POST /index/rebuild` or restart backend with `--rebuild-index` flag if available.
+  - call `POST /index/rebuild`.
   - watch logs for "Indice pronto" confirmation.
 
 Domain gate
@@ -50,7 +59,7 @@ Domain gate
 
 No-answer policy (how abstention is decided)
 - Factors combined:
-  - top retrieval score < `MIN_SCORE_TO_ANSWER`
+  - top retrieval score < `SCORE_THRESHOLD`
   - optionally `min_score_gap` (difference between top and runner-up)
   - domain gate rejects query (if enabled)
 - Result: backend returns a standardized no-answer response. See `backend/genisia_rag_engine.py` for implementation details.
@@ -63,7 +72,7 @@ Troubleshooting
 - Ollama errors: ensure Ollama service is running and models installed.
 - Missing documents: ensure `DOCS_PATH` points to the corpus folder; check log lines for file discovery.
 - Index build hangs or slow: increase memory or reduce chunk parallelism; re-run `POST /index/rebuild`.
-- Unexpected answers: raise `MIN_SCORE_TO_ANSWER`, enable domain gate, or run evaluation scripts (see `docs/EVALUATION.md`).
+- Unexpected answers: raise `SCORE_THRESHOLD`, enable domain gate, or run evaluation scripts (see `docs/EVALUATION.md`).
 
 Monitoring & logs
 - Backend writes structured logs with info on index build and query routing. Keep an audit log for answered queries for later evaluation.

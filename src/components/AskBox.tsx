@@ -45,7 +45,7 @@ export const AskBox = ({ onAsk, isLoading, disabled }: AskBoxProps) => {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Es. Come si determina l'aumento significativo del rischio di credito ai sensi dell'IFRS 9?"
+          placeholder="Es. Secondo IFRS 9, quando un'esposizione passa allo Stage 2 e quali fonti supportano la risposta?"
           disabled={disabled || isLoading}
           rows={3}
           className="resize-none border-0 p-0 text-base shadow-none focus-visible:ring-0"

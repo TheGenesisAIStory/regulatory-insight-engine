@@ -4,7 +4,7 @@ Backend locale FastAPI per collegare la UI React al motore RAG originale di Gen.
 
 ## Avvio
 
-Run these commands from the `backend/` directory. If you prefer to start the API from the repository root, use `uvicorn backend.api:app` instead of `uvicorn api:app`.
+Run these commands from the `backend/` directory. If you prefer to start the API from the repository root, use `uvicorn api:app --app-dir backend` instead of `uvicorn api:app`.
 
 ```bash
 cd backend
@@ -201,5 +201,4 @@ This repository now includes operator-facing runbooks and checklists under the t
 - Production vs experimental guidance: [docs/PRODUCTION_EXPERIMENTAL.md](../docs/PRODUCTION_EXPERIMENTAL.md)
 
 Follow those docs for operational procedures, threshold calibration and safety checks before changing runtime parameters.
-
 

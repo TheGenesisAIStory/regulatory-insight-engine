@@ -7,6 +7,7 @@ import { AskBox } from "@/components/AskBox";
 import { AnswerPanel, AnswerData } from "@/components/AnswerPanel";
 import { AnswerSkeleton } from "@/components/AnswerSkeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { MockAnswerCard } from "@/components/MockAnswerCard";
 import { DocumentLibrary } from "@/components/DocumentLibrary";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -186,6 +187,17 @@ const Index = () => {
             </div>
           </div>
 
+          <div className="mb-5 rounded-md border border-primary/20 bg-primary/5 px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium text-foreground">
+                Regulatory Insight Engine v0.1.0-beta
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Runtime locale · corpus regolamentare verificabile
+              </span>
+            </div>
+          </div>
+
           {/* Metrics */}
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MetricCard
@@ -227,6 +239,12 @@ const Index = () => {
           <div className="mb-5">
             <AskBox onAsk={handleAsk} isLoading={loading} />
           </div>
+
+          {!answer && !loading && (
+            <div className="mb-5">
+              <MockAnswerCard />
+            </div>
+          )}
 
           {/* Answer / loading */}
           {loading && <AnswerSkeleton />}

@@ -19,6 +19,11 @@ backend/eval/reports/
 
 # Environment
 .env
+.continue/
+
+# Local duplicate files created by editors or manual copies
+* 2.py
+* copy.py
 
 # Training exports and artifacts
 training/data/output/
