@@ -17,6 +17,9 @@ __pycache__
 *.py[cod]
 backend/eval/reports/
 
+# Pickle caches (embeddings/cache files should not be committed)
+*.pkl
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

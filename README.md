@@ -170,24 +170,14 @@ Avvia l'API:
 uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Per default l'API riusa la cartella originale del motore RAG, se presente:
+By default the API uses repository-relative paths so the project is portable after cloning.
 
-```text
-~/GitHub/rag-banca
-```
+Defaults (can be overridden via environment variables):
 
-Quindi puo' usare i PDF e la cache embeddings gia' generati:
+- `DOCS_PATH=./docs`
+- `CACHE_PATH=./backend/cache/embeddings_cache.pkl`
 
-```text
-~/GitHub/rag-banca/genisia_embeddings_cache.pkl
-~/GitHub/rag-banca/embeddings_cache.pkl
-```
-
-Puoi cambiare base directory con:
-
-```bash
-GENISIA_RAG_BASE_DIR=/percorso/rag-banca uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
-```
+You can override these values by setting `DOCS_PATH`, `CACHE_PATH`, or `RAG_BASE_DIR` in your environment when starting the server.
 
 ### Document corpus locale
 
@@ -210,12 +200,12 @@ TOP_K=6
 CHUNK_SIZE=420
 CHUNK_OVERLAP=80
 SCORE_THRESHOLD=0.12
-CACHE_PATH=/Users/itsgennymac/GitHub/rag-banca/genisia_embeddings_cache.pkl
-DOCS_PATH=/Users/itsgennymac/GitHub/rag-banca/normativa
+CACHE_PATH=./backend/cache/embeddings_cache.pkl
+DOCS_PATH=./docs
 LOG_LEVEL=INFO
 REQUEST_TIMEOUT_SECONDS=120
 CHAT_TIMEOUT_SECONDS=240
-AUDIT_LOG_PATH=/Users/itsgennymac/GitHub/rag-banca/normativa/log/queries.jsonl
+AUDIT_LOG_PATH=./docs/log/queries.jsonl
 ENABLE_DOMAIN_GATE=false
 DOMAIN_GATE_MODE=hybrid
 DOMAIN_GATE_TERMS_PATH=
@@ -226,8 +216,8 @@ Esempio (dal repository root):
 ```bash
 OLLAMA_HOST=http://localhost:11434 \
 LLM_MODEL=qwen2.5:3b \
-DOCS_PATH=/Users/itsgennymac/GitHub/rag-banca/normativa \
-CACHE_PATH=/Users/itsgennymac/GitHub/rag-banca/genisia_embeddings_cache.pkl \
+DOCS_PATH=./docs \
+CACHE_PATH=./backend/cache/embeddings_cache.pkl \
 uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -258,26 +248,48 @@ Modalita' supportate:
 
 `DOMAIN_GATE_TERMS_PATH` puo' puntare a un JSON locale con `allow_terms`, `deny_terms`, `extra_allow_terms` ed `extra_deny_terms`.
 
-### Index initialization (after checkout)
+### First-run (initialize index and cache)
 
-After cloning the repository and installing dependencies, initialize the retrieval index before first use. With the backend server running (see "Avvia l'API" above), run:
+After cloning and installing dependencies you can either copy an existing embeddings cache into the repository or rebuild the index locally.
+
+Option A — copy an existing cache (faster):
 
 ```bash
+# from repository root
+mkdir -p backend/cache
+cp /path/to/genisia_embeddings_cache.pkl backend/cache/embeddings_cache.pkl
+```
+
+Option B — rebuild the index (recommended when you don't have a cache):
+
+```bash
+# start Ollama in one terminal
+# ollama serve
+
+# start backend in another terminal (from repo root)
+cd backend
+source .venv/bin/activate
+uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+
+# trigger index build (new shell)
 curl -sS -X POST "http://127.0.0.1:8000/index/rebuild" \
   -H "Content-Type: application/json" \
   -d '{"download": false}'
 ```
 
-Recommendation: set the runtime answer threshold to reduce false positives:
+If your document corpus lives outside the repository, set the `DOCS_PATH` environment variable to point to your local folder before starting the API:
 
 ```bash
-# export for current shell session
-export SCORE_THRESHOLD=0.30
-# or start the API with the recommended threshold
-SCORE_THRESHOLD=0.30 uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
+DOCS_PATH=/absolute/path/to/your/docs uvicorn backend.api:app --reload --host 127.0.0.1 --port 8000
 ```
 
-This ensures the local PDF corpus is chunked and embedded and that `/ready` reports `true` before running evaluation or serving traffic.
+Recommendation: set `SCORE_THRESHOLD=0.30` in your environment to reduce false positive answers in typical setups:
+
+```bash
+export SCORE_THRESHOLD=0.30
+```
+
+After a successful `POST /index/rebuild` the `/ready` endpoint should report `true` and the engine will serve queries.
 
 ## Script disponibili
 
