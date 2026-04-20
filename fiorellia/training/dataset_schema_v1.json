@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fiorell.IA supervised behavior example v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "category",
+    "user_query",
+    "retrieved_snippets",
+    "assistant_answer",
+    "quality_notes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable unique id, for example fio-train-v1-001."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "answer_with_citations",
+        "refuse_out_of_scope",
+        "unsupported_abstention",
+        "regulatory_comparison",
+        "italian_supervisory_language",
+        "bank_specific_disclosure_style"
+      ]
+    },
+    "user_query": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieved_snippets": {
+      "type": "array",
+      "description": "Local retrieved evidence available to the assistant. Empty array is valid for refusal/abstention examples.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "text"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Local source reference, for example CRR.pdf p. 25."
+          },
+          "text": {
+            "type": "string",
+            "description": "Short retrieved excerpt used as evidence."
+          }
+        }
+      }
+    },
+    "assistant_answer": {
+      "type": "string",
+      "description": "Expected answer, refusal, or abstention. Must not include unsupported facts."
+    },
+    "quality_notes": {
+      "type": "string",
+      "description": "Short reviewer note explaining grounding, refusal reason, or source limitation."
+    }
+  },
+  "example": {
+    "id": "fio-train-v1-001",
+    "category": "unsupported_abstention",
+    "user_query": "Quali sono tutte le disclosure Pillar 3 di Intesa Sanpaolo nell'ultimo report?",
+    "retrieved_snippets": [],
+    "assistant_answer": "Non trovo nel corpus locale la disclosure banca-specifica necessaria. Senza quel documento indicizzato, non posso rispondere in modo affidabile sulla banca indicata.",
+    "quality_notes": "The relevant bank-specific source is missing; abstention is required."
+  }
+}

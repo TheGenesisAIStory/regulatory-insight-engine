@@ -1,0 +1,47 @@
+{
+  "name": "Fiorell.IA",
+  "version": "0.1.0-beta-track",
+  "runtime_owner": "shared_backend",
+  "runtime_path": "../backend",
+  "serving_path_locked": true,
+  "language_default": "it",
+  "offline_first": true,
+  "domain_scope": [
+    "crr",
+    "ifrs9_supported_only",
+    "banca_italia",
+    "eba_supported_only",
+    "basel_supported_only",
+    "pillar3_supported_only",
+    "italian_bank_disclosures_supported_only"
+  ],
+  "initial_strong_coverage": [
+    "default",
+    "internal_controls",
+    "own_funds",
+    "prudential_supervision"
+  ],
+  "coverage_limitations": [
+    "full_ifrs9_not_claimed",
+    "full_pillar3_not_claimed",
+    "full_eba_basel_consolidated_perimeter_not_claimed",
+    "bank_specific_disclosures_require_local_sources"
+  ],
+  "answer_policy": {
+    "source_grounded_only": true,
+    "refuse_out_of_scope": true,
+    "refuse_when_sources_insufficient": true,
+    "no_external_knowledge": true,
+    "citations_required_for_factual_answers": true
+  },
+  "shared_runtime_dependency": {
+    "owned_by_fiorellia": false,
+    "runtime_parameters_defined_here": false,
+    "notes": "Fiorell.IA describes product behavior expectations only. Thresholds, domain gate modes, retrieval settings and serving behavior remain owned by the shared runtime."
+  },
+  "artifact_policy": {
+    "do_not_commit_model_weights": true,
+    "do_not_commit_sensitive_documents": true,
+    "keep_training_artifacts_local_by_default": true
+  }
+}
