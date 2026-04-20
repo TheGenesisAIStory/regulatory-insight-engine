@@ -17,6 +17,12 @@ __pycache__
 *.py[cod]
 backend/eval/reports/
 
+# Environment
+.env
+
+# Training exports and artifacts
+training/data/output/
+
 # Pickle caches (embeddings/cache files should not be committed)
 *.pkl
 

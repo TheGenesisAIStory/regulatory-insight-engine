@@ -1,5 +1,7 @@
 # regulatory-insight-engine
+A lightweight prototype RAG system focused on regulatory CRR and IFRS9 content.
 
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
 A prototype RAG system focused on regulatory CRR and IFRS9 content, designed to be offline-first and auditable.
 
 Quick links
