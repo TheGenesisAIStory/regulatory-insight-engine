@@ -51,10 +51,11 @@ class Settings:
 
 def load_settings() -> Settings:
     project_root = Path(__file__).resolve().parents[1]
-    original_rag_dir = Path.home() / "GitHub" / "rag-banca"
-    base_dir = Path(_env("RAG_BASE_DIR", "GENISIA_RAG_BASE_DIR", str(original_rag_dir if original_rag_dir.exists() else project_root / "rag-banca")))
-    docs_path = Path(_env("DOCS_PATH", "GENISIA_DOCS_DIR", str(base_dir / "normativa")))
-    cache_path = Path(_env("CACHE_PATH", "GENISIA_CACHE_FILE", str(base_dir / "genisia_embeddings_cache.pkl")))
+    # Use repository-relative defaults to keep the project portable for new clones.
+    # Defaults can be overridden via environment variables.
+    base_dir = Path(_env("RAG_BASE_DIR", "GENISIA_RAG_BASE_DIR", str(project_root)))
+    docs_path = Path(_env("DOCS_PATH", "GENISIA_DOCS_DIR", str(project_root / "docs")))
+    cache_path = Path(_env("CACHE_PATH", "GENISIA_CACHE_FILE", str(project_root / "backend" / "cache" / "embeddings_cache.pkl")))
     log_dir = Path(_env("LOG_DIR", None, str(docs_path / "log")))
 
     categories = tuple(

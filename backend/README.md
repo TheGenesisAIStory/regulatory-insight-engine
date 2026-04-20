@@ -22,13 +22,12 @@ ollama pull embeddinggemma
 ollama pull qwen2.5:3b
 ```
 
-Per impostazione predefinita l'API riusa la cartella originale:
+Per impostazione predefinita l'API usa percorsi relativi nel repository. I valori di default sono:
 
-```text
-~/GitHub/rag-banca
-```
+- `DOCS_PATH=./docs`
+- `CACHE_PATH=./backend/cache/embeddings_cache.pkl`
 
-Puoi cambiarla con:
+Puoi comunque cambiare la base directory con:
 
 ```bash
 RAG_BASE_DIR=/percorso/rag-banca uvicorn api:app --reload --host 127.0.0.1 --port 8000
@@ -46,12 +45,12 @@ TOP_K=6
 CHUNK_SIZE=420
 CHUNK_OVERLAP=80
 SCORE_THRESHOLD=0.12
-CACHE_PATH=~/GitHub/rag-banca/genisia_embeddings_cache.pkl
-DOCS_PATH=~/GitHub/rag-banca/normativa
+CACHE_PATH=./backend/cache/embeddings_cache.pkl
+DOCS_PATH=./docs
 LOG_LEVEL=INFO
 REQUEST_TIMEOUT_SECONDS=120
 CHAT_TIMEOUT_SECONDS=240
-AUDIT_LOG_PATH=~/GitHub/rag-banca/normativa/log/queries.jsonl
+AUDIT_LOG_PATH=./docs/log/queries.jsonl
 ENABLE_DOMAIN_GATE=false
 DOMAIN_GATE_MODE=hybrid
 DOMAIN_GATE_TERMS_PATH=
