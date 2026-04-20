@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
@@ -20,10 +21,20 @@ from schemas import (
 )
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if engine.preload_if_available():
+        logger.info("Persisted RAG index loaded at startup.")
+    else:
+        logger.info("Persisted RAG index not ready at startup: %s", engine.last_error)
+    yield
+
+
 app = FastAPI(
     title="Gen.Is.IA Regulatory RAG API",
     version="0.2.0",
     responses={503: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    lifespan=lifespan,
 )
 
 app.add_middleware(

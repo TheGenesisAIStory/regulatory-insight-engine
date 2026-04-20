@@ -15,6 +15,18 @@ import { mockDocs } from "@/data/mockData";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, askGenisia, GenisiaApiError, getDocuments, getReadiness, HealthResponse, rebuildIndex } from "@/lib/genisiaApi";
 
+const DEMO_CONVERSATION = {
+  question: "Quali sono i requisiti di capitale CRR per il rischio di credito?",
+  answer:
+    "Secondo l'art. 92 CRR, gli enti devono mantenere un CET1 ≥ 4,5% del Total Risk Exposure Amount. Tier 1 ≥ 6%, Total Capital ≥ 8%.",
+  sources: [
+    "CRR Art. 92 — Requisiti di fondi propri",
+    "EBA SREP Guidelines 2023",
+  ],
+  score: "Score: 0.87",
+  tag: "⚡ Offline — Ollama/mistral",
+};
+
 const Index = () => {
   const [config, setConfig] = useState<AssistantConfig>({
     model: "qwen2.5:3b",
@@ -30,6 +42,7 @@ const Index = () => {
   const [apiDocs, setApiDocs] = useState(mockDocs);
   const [apiChecked, setApiChecked] = useState(false);
   const [readinessReasons, setReadinessReasons] = useState<string[]>([]);
+  const [demoConversation, setDemoConversation] = useState(DEMO_CONVERSATION);
 
   const apiOnline = Boolean(health?.ollamaOnline);
   const usingRealDocs = apiDocs !== mockDocs;
@@ -83,6 +96,7 @@ const Index = () => {
   const handleAsk = async (q: string) => {
     setLoading(true);
     setAnswer(null);
+    setDemoConversation(null);
 
     try {
       const data = await askGenisia(q, config.topK, config.model);
@@ -133,6 +147,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* DEMO ONLY — remove before production */}
+      <div style={{ background: "#1a1a2e", color: "white", fontSize: "12px", padding: "8px 16px" }}>
+        Regulatory Insight Engine v0.1.0-beta — Offline RAG for Banking Compliance
+      </div>
       <AppHeader
         modelStatus={!apiChecked ? "loading" : apiOnline ? "online" : "offline"}
         indexStatus={!apiChecked ? "warning" : health?.ready ? "online" : usingRealDocs ? "warning" : "offline"}
@@ -237,10 +255,54 @@ const Index = () => {
 
           {/* Ask */}
           <div className="mb-5">
-            <AskBox onAsk={handleAsk} isLoading={loading} />
+            {/* DEMO ONLY — remove before production */}
+            <AskBox onAsk={handleAsk} isLoading={loading} initialValue={DEMO_CONVERSATION.question} />
           </div>
 
-          {!answer && !loading && (
+          {/* DEMO ONLY — remove before production */}
+          {demoConversation && !answer && !loading && (
+            <div className="mb-5 space-y-3">
+              <div className="flex justify-end">
+                <div className="max-w-2xl rounded-md border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-medium text-foreground">
+                  {demoConversation.question}
+                </div>
+              </div>
+
+              <article className="panel-elevated overflow-hidden">
+                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
+                  <div>
+                    <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Risposta demo
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">Requisiti di capitale CRR</h3>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-success/25 bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success">
+                      {demoConversation.score}
+                    </span>
+                    <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                      {demoConversation.tag}
+                    </span>
+                  </div>
+                </header>
+                <div className="space-y-4 px-5 py-5">
+                  <p className="text-sm leading-relaxed text-foreground">{demoConversation.answer}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {demoConversation.sources.map((source) => (
+                      <span
+                        key={source}
+                        className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary"
+                      >
+                        {source}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            </div>
+          )}
+
+          {!demoConversation && !answer && !loading && (
             <div className="mb-5">
               <MockAnswerCard />
             </div>

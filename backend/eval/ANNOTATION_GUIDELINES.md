@@ -11,13 +11,33 @@ Campi richiesti per ogni record (JSONL):
 - `expected_sources`: lista di nomi di file o identificatori di documento presenti nel corpus (mantieni provenance).
 - `rationale` : opzionale, breve spiegazione del perché del target.
 - `language` : codice lingua (es. `it`).
-- `example_type` : uno dei: `factual_qa`, `definitional_qa`, `comparison_qa`, `no_answer`, `classification`, `source_grounded`.
+- `example_type` : uno dei tipi base (`factual_qa`, `definitional_qa`, `comparison_qa`, `no_answer`, `classification`, `source_grounded`) oppure uno dei tipi sperimentali Fiorell.IA (`answer_with_citations`, `refuse_out_of_scope`, `regulatory_comparison`, `italian_supervisory_language`, `bank_specific_disclosure_style`).
 
 Regole di creazione esempi
 - Evita di inserire dati personali o informazioni sensibili.
 - Preferisci risposte concise e verificabili nel corpus (1-4 frasi per risposte testuali).
 - In `expected_sources` inserisci il nome del file così come presente in `docs/` (o l'identificatore usato nel processo di indexing) per mantenere tracciabilità.
 - Per `no_answer` includi un `rationale` che spiega perché il corpus non contiene la risposta.
+
+## Estensione Fiorell.IA
+
+Fiorell.IA è una traccia sperimentale di specializzazione locale e offline-first. Non sostituisce il RAG runtime e non deve insegnare al modello a rispondere senza fonti.
+
+Tipi aggiuntivi:
+
+- `answer_with_citations`: risposta in italiano con citazioni esplicite e `expected_sources` non vuoto.
+- `refuse_out_of_scope`: domanda fuori perimetro o non supportata; `target` deve essere una breve astensione o stringa vuota, con `rationale`.
+- `regulatory_comparison`: confronto tra concetti normativi/contabili, es. CRR default vs IFRS 9 staging.
+- `italian_supervisory_language`: stile di risposta in linguaggio di vigilanza italiano, conciso e prudente.
+- `bank_specific_disclosure_style`: domande su disclosure/Pillar 3/bilanci di banche italiane; risponde solo se la fonte banca-specifica è presente.
+
+Regole Fiorell.IA:
+
+- Lingua predefinita: italiano.
+- Rispondere solo su CRR, IFRS 9, Banca d'Italia, EBA, Basel, Pillar 3 e disclosure bancarie indicizzate.
+- Ogni risposta fattuale deve avere `expected_sources`.
+- Le domande plausibili ma non supportate sono esempi positivi di rifiuto, non errori da coprire con conoscenza esterna.
+- Per banca-specific disclosure, non usare informazioni generali sulla banca se il documento locale non è presente.
 
 ID e versioning
 - Usa prefissi significativi: `<category>_<type>_<nnn>`. Mantieni `id` unico nel dataset.

@@ -23,6 +23,7 @@ python3 training/scripts/save_artifacts.py --input training/data --output traini
 Notes
 - Training is intentionally decoupled from runtime RAG. The repository contains export and validation tooling but does not run model fine-tuning by default.
 - If you run local training, do it on a separate machine or conda/venv and keep large artifacts in `training/data/output` (do not commit large model files).
+- Fiorell.IA specialization guidance lives in `docs/FIORELLIA_SPECIALIZATION.md`. It defines behavior, refusal policy, dataset taxonomy and go/no-go criteria for local LoRA or instruction tuning experiments.
 
 Recommended artifacts to keep
 - `instruction_train.jsonl` — final instruction-style dataset for tuning.
@@ -30,3 +31,4 @@ Recommended artifacts to keep
 
 Next steps (optional)
 - Implement LoRA or small-shot instruction tuning pipelines; keep those experiments separate from the main repo or under a `training/experiments/` folder with clear cleanup instructions.
+- Track Fiorell.IA runs in `training/experiments/fiorellia_runs.jsonl`.

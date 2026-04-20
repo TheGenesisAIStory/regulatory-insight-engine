@@ -8,6 +8,7 @@ Core components
 - RAG engine: `backend/genisia_rag_engine.py` — retrieval, scoring, domain-gate, and answer assembly.
 - Local model server: Ollama (embeddings + generation). Must be running and have required models pulled.
 - Corpus: `docs/` (PDF/HTML/MD). Embeddings cached in `CACHE_PATH` (see config).
+- Corpus lifecycle: `backend/corpus_lifecycle.py` handles download/update, manifest refresh and explicit index rebuild.
 
 Quick start (local)
 1. Start Ollama and ensure models are available.
@@ -48,6 +49,15 @@ Health & admin endpoints
 
 Indexing and caches
 - Embeddings are fingerprinted on chunk parameters; changing `CHUNK_SIZE`, `CHUNK_OVERLAP` or embedding model requires cache rebuild.
+- Startup reuses a valid persisted cache when available. It does not perform hidden full rebuilds.
+- To manage the local lifecycle:
+```bash
+cd backend
+python corpus_lifecycle.py download
+python corpus_lifecycle.py status
+python corpus_lifecycle.py rebuild
+python corpus_lifecycle.py ready
+```
 - To rebuild:
   - call `POST /index/rebuild`.
   - watch logs for "Indice pronto" confirmation.

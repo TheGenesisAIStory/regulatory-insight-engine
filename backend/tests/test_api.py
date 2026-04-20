@@ -82,6 +82,9 @@ class FakeEngine:
     def initialize(self, rebuild: bool = False, download: bool = True):
         return None
 
+    def preload_if_available(self):
+        return True
+
 
 def client(monkeypatch):
     monkeypatch.setattr(api, "engine", FakeEngine())

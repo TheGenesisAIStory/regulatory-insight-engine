@@ -49,8 +49,14 @@ class RuntimeStatus(BaseModel):
     ollamaOnline: bool
     baseDir: str
     docsDir: str
+    corpusManifest: Optional[str] = None
+    corpusManifestExists: bool = False
     cacheFile: str
+    indexManifest: Optional[str] = None
+    indexManifestExists: bool = False
     cacheExists: bool
+    cacheValid: bool = False
+    cacheStale: bool = False
     documents: int
     chunks: int
     embedModel: str

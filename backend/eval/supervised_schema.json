@@ -12,7 +12,23 @@
     "expected_sources": { "type": "array", "items": { "type": "string" }, "description": "List of source filenames or identifiers used as provenance" },
     "rationale": { "type": "string", "description": "Optional short rationale for the annotation" },
     "language": { "type": "string", "description": "Language code, e.g. it or en" },
-    "example_type": { "type": "string", "enum": ["factual_qa", "definitional_qa", "comparison_qa", "no_answer", "classification", "source_grounded"], "description": "Type of supervised example" }
+    "example_type": {
+      "type": "string",
+      "enum": [
+        "factual_qa",
+        "definitional_qa",
+        "comparison_qa",
+        "no_answer",
+        "classification",
+        "source_grounded",
+        "answer_with_citations",
+        "refuse_out_of_scope",
+        "regulatory_comparison",
+        "italian_supervisory_language",
+        "bank_specific_disclosure_style"
+      ],
+      "description": "Type of supervised example"
+    }
   },
   "additionalProperties": false
 }

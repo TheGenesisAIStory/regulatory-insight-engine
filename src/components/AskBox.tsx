@@ -7,6 +7,7 @@ interface AskBoxProps {
   onAsk: (q: string) => void;
   isLoading: boolean;
   disabled?: boolean;
+  initialValue?: string;
 }
 
 const SUGGESTIONS = [
@@ -16,8 +17,8 @@ const SUGGESTIONS = [
   "Requisiti sulla concentrazione dei rischi nel CRR",
 ];
 
-export const AskBox = ({ onAsk, isLoading, disabled }: AskBoxProps) => {
-  const [value, setValue] = useState("");
+export const AskBox = ({ onAsk, isLoading, disabled, initialValue = "" }: AskBoxProps) => {
+  const [value, setValue] = useState(initialValue);
 
   const submit = () => {
     const q = value.trim();

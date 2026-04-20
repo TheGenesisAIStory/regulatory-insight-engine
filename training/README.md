@@ -6,6 +6,7 @@ Struttura:
 
 - `training/config/` — configurazioni (JSON)
 - `training/data/` — dati di lavoro, output e artefatti
+- `training/experiments/` — registry leggero per esperimenti Fiorell.IA
 - `training/scripts/` — script per validazione, split, esportazione e salvataggio artefatti
 
 Principi:
@@ -41,3 +42,27 @@ python training/scripts/save_artifacts.py --input training/data --output trainin
 ```
 
 Vedi i singoli script in `training/scripts/` per opzioni avanzate.
+
+## Fiorell.IA specialization track
+
+Fiorell.IA è una traccia sperimentale per specializzare localmente lo stile e il comportamento di un assistente regolamentare bancario italiano. Non sostituisce il runtime RAG e non modifica `backend/`.
+
+Documentazione principale:
+
+```text
+docs/FIORELLIA_SPECIALIZATION.md
+```
+
+Registry esperimenti:
+
+```text
+training/experiments/fiorellia_runs.jsonl
+```
+
+Config placeholder:
+
+```text
+training/config/fiorellia_config.json
+```
+
+Usa questa traccia per dataset expansion, export instruction-tuning, LoRA locale ed evaluation contro la baseline. Non committare pesi, adapter o artefatti binari grandi.

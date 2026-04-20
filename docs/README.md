@@ -25,6 +25,8 @@ Come aggiungere un documento (passi rapidi)
 4. (Opzionale) Aggiungi una versione testuale (`.txt`/`.md`) se vuoi renderlo facilmente inspectable.
 5. Ri-build dell'indice: usa l'endpoint `POST /index/rebuild` o imposta `DOCS_PATH` e riavvia come spiegato nel `backend/README.md`.
 
+Per il ciclo completo download/update corpus, manifest locale e rebuild esplicito della cache embeddings, vedi [CORPUS_LIFECYCLE.md](CORPUS_LIFECYCLE.md).
+
 Regole aggiuntive
 
 - Segui le convenzioni in `docs/CONVENTIONS.md` per massimizzare compatibilità con la pipeline di ingestion.

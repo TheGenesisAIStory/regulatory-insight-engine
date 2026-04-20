@@ -1,0 +1,13 @@
+{
+  "track": "Fiorell.IA",
+  "status": "experimental",
+  "language": "it",
+  "base_model": "local-instruction-model",
+  "dataset_path": "backend/eval/supervised_seed.cleaned.jsonl",
+  "output_dir": "training/data/output/fiorellia",
+  "instruction_style": "alpaca",
+  "recommended_runtime_mode": "score_plus_domain_gate",
+  "recommended_score_threshold": 0.3,
+  "domain_gate_mode": "hybrid",
+  "notes": "Offline-first specialization config placeholder. Does not change production RAG runtime."
+}

@@ -14,9 +14,11 @@ Recommended beta runtime posture:
 - validate your corpus with the benchmark before trusting changes.
 
 Quick links:
+ - Corpus lifecycle: [docs/CORPUS_LIFECYCLE.md](docs/CORPUS_LIFECYCLE.md)
  - Runtime runbook: [docs/RUNTIME_RAG.md](docs/RUNTIME_RAG.md)
  - Evaluation: [docs/EVALUATION.md](docs/EVALUATION.md)
  - Supervised dataset: [docs/DOMAIN_DATASET.md](docs/DOMAIN_DATASET.md)
+ - Fiorell.IA specialization: [docs/FIORELLIA_SPECIALIZATION.md](docs/FIORELLIA_SPECIALIZATION.md)
  - Training prep: [docs/TRAINING_PREP.md](docs/TRAINING_PREP.md)
  - Validation checklist: [docs/CHECKLIST.md](docs/CHECKLIST.md)
  - Production vs experimental: [docs/PRODUCTION_EXPERIMENTAL.md](docs/PRODUCTION_EXPERIMENTAL.md)
@@ -48,12 +50,13 @@ Evaluation and calibration
  - For threshold calibration, prefer `score_plus_domain_gate` mode and sweep `min_score_gap` and `threshold` first (cheap).
 
 Domain gate & corpus
- - Corpus lives under `docs/` — include authoritative PDFs/HTML and maintain consistent filenames for provenance.
+ - Corpus lives under `docs/` by default. Use `backend/corpus_lifecycle.py` to download/update sources, refresh the corpus manifest, and rebuild the persisted embeddings cache explicitly.
  - Domain gate configuration and terms file are under `backend/` and documented in the runtime runbook.
 
 Training prep
  - Training tooling is isolated in `training/` and exported artifacts live under `training/data/output`.
  - Training is optional and experimental; see `docs/TRAINING_PREP.md`.
+ - Fiorell.IA is a documented local specialization track for Italian banking regulation; it remains decoupled from the production RAG runtime.
 
 Troubleshooting
  - See runtime runbook and evaluation docs above. Common issues: Ollama not running, missing models, cache mismatches after chunk changes.
@@ -193,7 +196,20 @@ You can override these values by setting `DOCS_PATH`, `CACHE_PATH`, or `RAG_BASE
 
 ### Document corpus locale
 
-Il repository contiene ora una cartella `docs/` pensata per ospitare il corpus documentale per CRR, IFRS9, documenti di Banca d'Italia, EBA e disclosure bancarie (es. Intesa Sanpaolo). Per usare i documenti locali imposta `DOCS_PATH` sul path assoluto della cartella `docs/` nel repository oppure usa l'endpoint `POST /index/rebuild` del backend. Vedi `docs/README.md` e `docs/CONVENTIONS.md` per istruzioni e convenzioni.
+Il repository usa `DOCS_PATH=./docs` come corpus locale stabile e `CACHE_PATH=./backend/cache/embeddings_cache.pkl` come cache embeddings persistente. Il downloader salva le fonti in cartelle di categoria come `docs/crr/`, `docs/ifrs9/`, `docs/basel/` e `docs/banca_ditalia/`. I documenti scaricati restano su disco tra i riavvii; il backend prova a caricare la cache valida allo startup e non ricostruisce embeddings in background.
+
+Workflow consigliato:
+
+```bash
+cd backend
+source .venv/bin/activate
+python corpus_lifecycle.py download
+python corpus_lifecycle.py status
+python corpus_lifecycle.py rebuild
+python corpus_lifecycle.py ready
+```
+
+`download` e' idempotente: salta i file gia' presenti e aggiorna `DOCS_PATH/corpus_manifest.json` con URL sorgente, filename, size, mtime e hash. `rebuild` aggiorna la cache embeddings e il manifest indice. Se il corpus cambia, `/ready` segnala cache stale e richiede un rebuild esplicito. Vedi [docs/CORPUS_LIFECYCLE.md](docs/CORPUS_LIFECYCLE.md), `docs/README.md` e `docs/CONVENTIONS.md`.
 
 ### Training preparation (optional)
 
@@ -217,6 +233,8 @@ DOCS_PATH=./docs
 LOG_LEVEL=INFO
 REQUEST_TIMEOUT_SECONDS=120
 CHAT_TIMEOUT_SECONDS=240
+CHAT_NUM_PREDICT=64
+CHAT_NUM_CTX=2048
 AUDIT_LOG_PATH=./docs/log/queries.jsonl
 ENABLE_DOMAIN_GATE=false
 DOMAIN_GATE_MODE=hybrid
@@ -273,22 +291,17 @@ mkdir -p backend/cache
 cp /path/to/genisia_embeddings_cache.pkl backend/cache/embeddings_cache.pkl
 ```
 
-Option B — rebuild the index (recommended when you don't have a cache):
+Option B — download/update the corpus and rebuild the index locally:
 
 ```bash
-# start Ollama in one terminal
-# ollama serve
-
-# start backend in another terminal
 cd backend
 source .venv/bin/activate
-uvicorn api:app --reload --host 127.0.0.1 --port 8000
-
-# trigger index build (new shell)
-curl -sS -X POST "http://127.0.0.1:8000/index/rebuild" \
-  -H "Content-Type: application/json" \
-  -d '{"download": false}'
+python corpus_lifecycle.py download
+python corpus_lifecycle.py rebuild
+python corpus_lifecycle.py ready
 ```
+
+You can also trigger a controlled rebuild through the running API with `POST /index/rebuild`. The backend does not force an expensive full reindex on startup or first ask when the cache is missing/stale.
 
 If your document corpus lives outside the repository, set the `DOCS_PATH` environment variable to point to your local folder before starting the API:
 
@@ -312,7 +325,7 @@ Recommendation: set `SCORE_THRESHOLD=0.30` in your environment to reduce false p
 export SCORE_THRESHOLD=0.30
 ```
 
-After a successful `POST /index/rebuild` the `/ready` endpoint should report `true` and the engine will serve queries.
+After a successful rebuild and backend startup, the `/ready` endpoint should report `true` and the engine will serve queries from the persisted local index.
 
 ## Script disponibili
 
@@ -701,7 +714,7 @@ La calibrazione genera una tabella comparativa con source hit rate, copertura in
 - `model not found`: installa il modello richiesto con `ollama pull qwen2.5:3b` oppure imposta `LLM_MODEL` a un modello disponibile.
 - `embedding model not found`: installa `ollama pull embeddinggemma`.
 - `Indice non ancora caricato`: fai una prima domanda oppure chiama `POST /index/rebuild`.
-- `Timeout da Ollama`: il primo giro puo' essere lento per caricare il modello. Aumenta `CHAT_TIMEOUT_SECONDS` se necessario.
+- `Timeout da Ollama`: il primo giro puo' essere lento per caricare il modello. Se il modello genera lentamente su CPU, riduci `CHAT_NUM_PREDICT`, mantieni `CHAT_NUM_CTX` contenuto oppure aumenta `CHAT_TIMEOUT_SECONDS`.
 - `Nessun PDF trovato`: controlla `DOCS_PATH` e la struttura `normativa/<categoria>/*.pdf`.
 - `CORS/API non raggiungibile`: controlla che la UI punti a `VITE_GENISIA_API_URL=http://127.0.0.1:8000`.
 

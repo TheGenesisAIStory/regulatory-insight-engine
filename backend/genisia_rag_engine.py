@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import pickle
 import re
 import time
 import warnings
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -28,6 +30,8 @@ BASE_DIR = settings.base_dir
 DOCS_DIR = settings.docs_path
 CACHE_FILE = settings.cache_path
 LOG_DIR = settings.log_dir
+CORPUS_MANIFEST_FILE = DOCS_DIR / "corpus_manifest.json"
+INDEX_MANIFEST_FILE = CACHE_FILE.with_suffix(".manifest.json")
 
 EMBED_MODEL = settings.embed_model
 CHAT_MODEL = settings.llm_model
@@ -199,6 +203,19 @@ def ensure_directories() -> None:
     BASE_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def normalize(vec: np.ndarray) -> np.ndarray:
@@ -225,6 +242,62 @@ def download_file(url: str, path: Path, timeout: int = 60) -> None:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 handle.write(chunk)
+
+
+def resource_url_for_path(path: Path) -> str | None:
+    category = path.parent.name
+    expected_name = path.stem
+    for name, url in RESOURCES.get(category, []):
+        if name == expected_name:
+            return url
+    return None
+
+
+def build_corpus_manifest(pdf_paths: list[Path] | None = None) -> dict[str, Any]:
+    pdf_paths = pdf_paths or configured_pdf_paths(load_only_ifrs9=False)
+    documents = []
+    for path in pdf_paths:
+        stat = path.stat()
+        try:
+            relative_path = str(path.relative_to(DOCS_DIR))
+        except ValueError:
+            relative_path = str(path)
+        documents.append(
+            {
+                "category": path.parent.name,
+                "filename": path.name,
+                "path": relative_path,
+                "sourceUrl": resource_url_for_path(path),
+                "size": stat.st_size,
+                "mtime": int(stat.st_mtime),
+                "sha256": file_sha256(path),
+            }
+        )
+
+    return {
+        "version": 1,
+        "generatedAt": utc_now(),
+        "docsDir": str(DOCS_DIR),
+        "documents": documents,
+    }
+
+
+def save_corpus_manifest(pdf_paths: list[Path] | None = None) -> dict[str, Any]:
+    ensure_directories()
+    manifest = build_corpus_manifest(pdf_paths)
+    CORPUS_MANIFEST_FILE.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    logger.info("Corpus manifest aggiornato: %s", CORPUS_MANIFEST_FILE)
+    return manifest
+
+
+def load_corpus_manifest() -> dict[str, Any] | None:
+    if not CORPUS_MANIFEST_FILE.exists():
+        return None
+    try:
+        return json.loads(CORPUS_MANIFEST_FILE.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Corpus manifest non leggibile: %s", exc)
+        return None
 
 
 def find_pdf_links(page_url: str, timeout: int = 60) -> list[str]:
@@ -275,6 +348,8 @@ def download_all() -> None:
                     download_pdfs_from_page(category, url)
             except Exception as exc:
                 logger.error("Errore download %s: %s", url, exc)
+
+    save_corpus_manifest()
 
 
 def configured_pdf_paths(load_only_ifrs9: bool = False) -> list[Path]:
@@ -395,6 +470,37 @@ def cache_metadata(pdf_paths: list[Path]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def cache_state(pdf_paths: list[Path]) -> dict[str, Any]:
+    current_metadata = cache_metadata(pdf_paths) if pdf_paths else None
+    cached_metadata = None
+    cache_readable = False
+    chunks = 0
+    error = None
+
+    if CACHE_FILE.exists():
+        try:
+            with CACHE_FILE.open("rb") as handle:
+                cached = pickle.load(handle)
+            cached_metadata = cached.get("metadata")
+            chunks = len(cached.get("chunks", []))
+            cache_readable = True
+        except Exception as exc:
+            error = str(exc)
+
+    cache_exists = CACHE_FILE.exists()
+    valid = bool(cache_exists and cache_readable and current_metadata and cached_metadata == current_metadata)
+    return {
+        "cacheExists": cache_exists,
+        "cacheReadable": cache_readable,
+        "cacheValid": valid,
+        "cacheStale": bool(cache_exists and current_metadata and cached_metadata and cached_metadata != current_metadata),
+        "currentMetadata": current_metadata,
+        "cachedMetadata": cached_metadata,
+        "chunks": chunks,
+        "error": error,
+    }
+
+
 def load_embeddings_cache(pdf_paths: list[Path]):
     if not CACHE_FILE.exists():
         return None
@@ -413,14 +519,31 @@ def load_embeddings_cache(pdf_paths: list[Path]):
 
 def save_embeddings_cache(chunks, sources, embeddings, pdf_paths: list[Path]) -> None:
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    metadata = cache_metadata(pdf_paths)
     payload = {
-        "metadata": cache_metadata(pdf_paths),
+        "metadata": metadata,
         "chunks": chunks,
         "sources": sources,
         "embeddings": embeddings,
     }
     with CACHE_FILE.open("wb") as handle:
         pickle.dump(payload, handle)
+
+    index_manifest = {
+        "version": 1,
+        "rebuiltAt": utc_now(),
+        "cacheFile": str(CACHE_FILE),
+        "metadata": metadata,
+        "docsDir": str(DOCS_DIR),
+        "documents": len(pdf_paths),
+        "chunks": len(chunks),
+        "embedModel": EMBED_MODEL,
+        "chunkSize": CHUNK_WORDS,
+        "chunkOverlap": CHUNK_OVERLAP,
+        "maxEmbedChars": MAX_EMBED_CHARS,
+        "corpusManifest": str(CORPUS_MANIFEST_FILE),
+    }
+    INDEX_MANIFEST_FILE.write_text(json.dumps(index_manifest, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def keyword_score(query: str, chunk: str) -> float:
@@ -490,10 +613,24 @@ class GenisiaEngine:
             raise RagInitializationError(f"Nessun documento caricato da {DOCS_DIR}.")
 
         pdf_paths = configured_pdf_paths(load_only_ifrs9=False)
+        if not download:
+            save_corpus_manifest(pdf_paths)
         cached = None if rebuild else load_embeddings_cache(pdf_paths)
 
         if cached:
             self.chunks, self.sources, self.embeddings = cached
+        elif not rebuild:
+            state = cache_state(pdf_paths)
+            if not state["cacheExists"]:
+                reason = "cache embeddings mancante"
+            elif state["cacheStale"]:
+                reason = "cache embeddings stale rispetto al corpus corrente"
+            else:
+                reason = "cache embeddings non leggibile o non valida"
+            raise RagInitializationError(
+                f"Indice non pronto ({reason}). Esegui un rebuild esplicito con "
+                "`POST /index/rebuild` oppure `python corpus_lifecycle.py rebuild`."
+            )
         else:
             chunks = []
             sources = []
@@ -512,10 +649,34 @@ class GenisiaEngine:
 
     def ensure_ready(self) -> None:
         if not self.ready:
-            self.initialize(download=True)
+            self.initialize(download=False)
+
+    def preload_if_available(self) -> bool:
+        self.last_error = None
+        pdf_paths = configured_pdf_paths(load_only_ifrs9=False)
+        if not pdf_paths:
+            self.last_error = f"Nessun PDF trovato in {DOCS_DIR}."
+            return False
+
+        cached = load_embeddings_cache(pdf_paths)
+        if not cached:
+            state = cache_state(pdf_paths)
+            if state["cacheStale"]:
+                self.last_error = "Cache embeddings stale: rebuild esplicito richiesto."
+            elif not state["cacheExists"]:
+                self.last_error = "Cache embeddings mancante: rebuild esplicito richiesto."
+            else:
+                self.last_error = "Cache embeddings non valida: rebuild esplicito richiesto."
+            return False
+
+        self.chunks, self.sources, self.embeddings = cached
+        self.ready = True
+        logger.info("Indice caricato da cache: chunks=%s cache=%s", len(self.chunks), CACHE_FILE)
+        return True
 
     def status(self) -> dict[str, Any]:
         pdf_paths = configured_pdf_paths(load_only_ifrs9=False)
+        state = cache_state(pdf_paths)
         ollama_online = True
         error = self.last_error
         available_models: list[str] = []
@@ -533,8 +694,14 @@ class GenisiaEngine:
             "ollamaOnline": ollama_online,
             "baseDir": str(BASE_DIR),
             "docsDir": str(DOCS_DIR),
+            "corpusManifest": str(CORPUS_MANIFEST_FILE),
+            "corpusManifestExists": CORPUS_MANIFEST_FILE.exists(),
             "cacheFile": str(CACHE_FILE),
-            "cacheExists": CACHE_FILE.exists(),
+            "indexManifest": str(INDEX_MANIFEST_FILE),
+            "indexManifestExists": INDEX_MANIFEST_FILE.exists(),
+            "cacheExists": state["cacheExists"],
+            "cacheValid": state["cacheValid"],
+            "cacheStale": state["cacheStale"],
             "documents": len(pdf_paths),
             "chunks": len(self.chunks),
             "embedModel": EMBED_MODEL,
@@ -556,7 +723,7 @@ class GenisiaEngine:
         checks = {
             "ollama": bool(status["ollamaOnline"]),
             "documents": status["documents"] > 0,
-            "cache": bool(status["cacheExists"]),
+            "cache": bool(status["cacheValid"]),
             "index": self.ready and status["chunks"] > 0,
             "chatModel": bool(status.get("activeChatModel")),
             "embedModel": EMBED_MODEL in available or f"{EMBED_MODEL}:latest" in available,
@@ -566,8 +733,12 @@ class GenisiaEngine:
             reasons.append("Ollama non e' raggiungibile.")
         if not checks["documents"]:
             reasons.append(f"Nessun PDF trovato in {DOCS_DIR}.")
+        if status.get("cacheStale"):
+            reasons.append("Cache embeddings stale rispetto al corpus: rebuild esplicito richiesto.")
+        elif not checks["cache"]:
+            reasons.append("Cache embeddings mancante o non valida: rebuild esplicito richiesto.")
         if not checks["index"]:
-            reasons.append("Indice non ancora caricato: verra' inizializzato alla prima richiesta o tramite rebuild.")
+            reasons.append("Indice non ancora caricato: usa una cache valida o esegui un rebuild esplicito.")
         if not checks["chatModel"]:
             reasons.append(f"Modello chat non disponibile: {CHAT_MODEL}.")
         if not checks["embedModel"]:
@@ -643,15 +814,30 @@ Rules:
 - Do not use external knowledge, training memory, assumptions or unstated definitions except the glossary above.
 """
 
-        response = SESSION.post(
-            f"{OLLAMA_BASE_URL}/api/chat",
-            json={
-                "model": resolved_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-            },
-            timeout=settings.chat_timeout_seconds,
-        )
+        try:
+            response = SESSION.post(
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": resolved_model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "options": {
+                        "num_predict": settings.chat_num_predict,
+                        "num_ctx": settings.chat_num_ctx,
+                    },
+                },
+                timeout=settings.chat_timeout_seconds,
+            )
+        except requests.Timeout as exc:
+            raise OllamaUnavailableError(
+                "Timeout durante la generazione Ollama "
+                f"con modello '{resolved_model}' dopo {settings.chat_timeout_seconds}s. "
+                "Verifica che il modello risponda localmente o riduci CHAT_NUM_PREDICT."
+            ) from exc
+        except requests.RequestException as exc:
+            raise OllamaUnavailableError(
+                f"Errore di connessione a Ollama su {OLLAMA_BASE_URL}: {exc}"
+            ) from exc
         data = safe_get_json(response)
         content = data.get("message", {}).get("content")
         if not content:

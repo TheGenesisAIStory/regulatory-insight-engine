@@ -43,6 +43,8 @@ class Settings:
     domain_gate_terms_path: Path | None
     request_timeout_seconds: int
     chat_timeout_seconds: int
+    chat_num_predict: int
+    chat_num_ctx: int
     log_level: str
     use_proxy: bool
     http_proxy: str
@@ -87,6 +89,8 @@ def load_settings() -> Settings:
         domain_gate_terms_path=Path(path) if (path := _env("DOMAIN_GATE_TERMS_PATH", None, "")) else None,
         request_timeout_seconds=int(_env("REQUEST_TIMEOUT_SECONDS", None, "120")),
         chat_timeout_seconds=int(_env("CHAT_TIMEOUT_SECONDS", None, "240")),
+        chat_num_predict=int(_env("CHAT_NUM_PREDICT", None, "64")),
+        chat_num_ctx=int(_env("CHAT_NUM_CTX", None, "2048")),
         log_level=_env("LOG_LEVEL", None, "INFO").upper(),
         use_proxy=_bool(_env("USE_PROXY", "GENISIA_USE_PROXY", "false")),
         http_proxy=_env("HTTP_PROXY_URL", "GENISIA_HTTP_PROXY", "http://proxy.miaazienda.it:8080"),
