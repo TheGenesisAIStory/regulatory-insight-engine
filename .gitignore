@@ -37,6 +37,7 @@ lockfile-backup-*/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+*.code-workspace
 .idea
 .DS_Store
 *.suo
