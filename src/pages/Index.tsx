@@ -30,7 +30,7 @@ const Index = () => {
   const [apiDocs, setApiDocs] = useState(mockDocs);
   const [apiChecked, setApiChecked] = useState(false);
   const [readinessReasons, setReadinessReasons] = useState<string[]>([]);
-  const [demoConversation, setDemoConversation] = useState(DEMO_CONVERSATION);
+  
 
   const apiOnline = Boolean(health?.ollamaOnline);
   const usingRealDocs = apiDocs !== mockDocs;
@@ -84,7 +84,7 @@ const Index = () => {
   const handleAsk = async (q: string) => {
     setLoading(true);
     setAnswer(null);
-    setDemoConversation(null);
+    
 
     try {
       const data = await askGenisia(q, config.topK, config.model);
