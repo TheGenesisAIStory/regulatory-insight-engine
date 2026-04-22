@@ -39,13 +39,13 @@ fiorellia/training/lora/**/logs/
 *.bin
 ```
 
-The current final Fiorell.IA adapter remains tracked for now:
+Final Fiorell.IA adapter weights are local-only unless Git LFS is explicitly configured:
 
 ```text
-fiorellia/training/lora/fiorellia_behavior_20260421/
+fiorellia/training/lora/**/*.safetensors
 ```
 
-This preserves the current repository state while avoiding repeated intermediate checkpoint churn. For future adapters, prefer one of these explicit policies before committing:
+Keep adapter metadata, configs, tokenizers, manifests, and README files in Git when they are useful for reproducibility. Store large adapter weight files outside normal Git history. For future adapters, prefer one of these explicit policies before committing:
 
 1. Store small metadata and manifests in Git, and publish adapter weights as GitHub Release assets.
 2. Use Git LFS for `*.safetensors` if the repository is expected to version model weights.

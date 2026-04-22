@@ -51,5 +51,6 @@ lockfile-backup-*/
 fiorellia/training/lora/**/checkpoint-*/
 fiorellia/training/lora/**/runs/
 fiorellia/training/lora/**/logs/
+fiorellia/training/lora/**/*.safetensors
 *.pt
 *.bin
