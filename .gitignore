@@ -44,3 +44,10 @@ training/data/output/
 
 # Local virtual environments
 .venv*/
+
+# Fiorell.IA local training artifacts (keep final curated docs/configs tracked)
+fiorellia/training/lora/**/checkpoint-*/
+fiorellia/training/lora/**/runs/
+fiorellia/training/lora/**/logs/
+*.pt
+*.bin
