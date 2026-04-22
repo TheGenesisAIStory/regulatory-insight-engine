@@ -16,6 +16,7 @@ backend/.venv
 __pycache__
 *.py[cod]
 backend/eval/reports/
+.pytest_cache/
 
 # Environment
 .env
@@ -27,6 +28,7 @@ backend/eval/reports/
 
 # Training exports and artifacts
 training/data/output/
+lockfile-backup-*/
 
 # Pickle caches (embeddings/cache files should not be committed)
 *.pkl
