@@ -7,7 +7,6 @@ import { AskBox } from "@/components/AskBox";
 import { AnswerPanel, AnswerData } from "@/components/AnswerPanel";
 import { AnswerSkeleton } from "@/components/AnswerSkeleton";
 import { EmptyState } from "@/components/EmptyState";
-import { MockAnswerCard } from "@/components/MockAnswerCard";
 import { DocumentLibrary } from "@/components/DocumentLibrary";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
