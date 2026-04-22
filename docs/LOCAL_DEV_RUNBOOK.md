@@ -4,7 +4,13 @@ This runbook keeps local setup, smoke checks, evaluation, and Fiorell.IA trainin
 
 ## Repository Location
 
-Avoid running day-to-day Git operations from an iCloud-synced working tree when possible. This repository has been observed under:
+Use the local, non-iCloud working tree for day-to-day Git operations:
+
+```bash
+/Users/itsgennymac/GitHub/regulatory-insight-engine
+```
+
+Avoid running day-to-day Git operations from an iCloud-synced working tree. A previous working copy was observed under:
 
 ```bash
 /Users/itsgennymac/Library/Mobile Documents/com~apple~CloudDocs/Documents/GitHub/regulatory-insight-engine

@@ -18,6 +18,18 @@ The domain-focused benchmark for CRR, IFRS 9, Banca d'Italia and Italian-bank di
 backend/eval/domain_dataset.jsonl
 ```
 
+The Fiorell.IA supervised seed also has a benchmark view derived from the training seed:
+
+```text
+backend/eval/fiorellia_supervised_seed_eval.jsonl
+```
+
+Regenerate it from the chat-style supervised file with:
+
+```bash
+python3 backend/eval/build_fiorellia_seed_eval.py
+```
+
 Each JSONL row can include:
 
 - `id`
@@ -46,6 +58,17 @@ python eval/run_benchmark.py \
   --dataset eval/domain_dataset.jsonl \
   --out eval/reports/domain_latest.json \
   --markdown eval/reports/domain_latest.md
+```
+
+Fiorell.IA seed benchmark:
+
+```bash
+cd backend
+source .venv/bin/activate
+python eval/run_benchmark.py \
+  --dataset eval/fiorellia_supervised_seed_eval.jsonl \
+  --out eval/reports/fiorellia_seed_latest.json \
+  --markdown eval/reports/fiorellia_seed_latest.md
 ```
 
 Full local benchmark with LLM generation and groundedness heuristic:
@@ -121,6 +144,13 @@ For the domain dataset, the JSON and Markdown reports also include metrics and f
 - `bank_specific`
 - `near_domain_ood`
 - `no_answer`
+
+For the Fiorell.IA seed benchmark, category metrics are grouped as:
+
+- `fiorellia_grounded_answer`
+- `fiorellia_insufficient_context`
+- `fiorellia_out_of_scope`
+- `fiorellia_refusal_safe`
 
 The script exits with a non-zero status when failed cases are present. This is intentional for regression testing and CI-style checks.
 
