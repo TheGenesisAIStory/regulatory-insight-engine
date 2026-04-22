@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileStack, Layers, Cpu, Database, PanelLeftClose, PanelLeft, Library } from "lucide-react";
+import { FileStack, Layers, Cpu, Database, PanelLeftClose, PanelLeft, Library, History, X } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { ConfigSidebar, AssistantConfig } from "@/components/ConfigSidebar";
 import { MetricCard } from "@/components/MetricCard";
@@ -9,11 +9,13 @@ import { AnswerPanel, AnswerData } from "@/components/AnswerPanel";
 import { AnswerSkeleton } from "@/components/AnswerSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { DocumentLibrary } from "@/components/DocumentLibrary";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { mockDocs } from "@/data/mockData";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, askGenisia, GenisiaApiError, getDocuments, getReadiness, HealthResponse, rebuildIndex } from "@/lib/genisiaApi";
+import { todayCount, useHistoryStore } from "@/store/historyStore";
 
 
 const Index = () => {
@@ -27,11 +29,17 @@ const Index = () => {
   const [answer, setAnswer] = useState<AnswerData | null>(null);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [apiDocs, setApiDocs] = useState(mockDocs);
   const [apiChecked, setApiChecked] = useState(false);
   const [readinessReasons, setReadinessReasons] = useState<string[]>([]);
-  
+
+  const addHistoryEntry = useHistoryStore((s) => s.addEntry);
+  const historyEntries = useHistoryStore((s) => s.entries);
+  const todayQueries = todayCount(historyEntries);
 
   const apiOnline = Boolean(health?.ollamaOnline);
   const usingRealDocs = apiDocs !== mockDocs;
@@ -85,11 +93,14 @@ const Index = () => {
   const handleAsk = async (q: string) => {
     setLoading(true);
     setAnswer(null);
-    
+    setActiveHistoryId(null);
+    setReadOnly(false);
 
     try {
       const data = await askGenisia(q, config.topK, config.model);
       setAnswer(data);
+      const entry = addHistoryEntry(q, data);
+      setActiveHistoryId(entry.id);
     } catch (error) {
       const message = error instanceof GenisiaApiError ? `${error.message} (HTTP ${error.status})` : error instanceof Error ? error.message : "Errore sconosciuto";
       toast({
@@ -142,7 +153,7 @@ const Index = () => {
       />
 
       <div className="mx-auto flex max-w-[1600px]">
-        {/* Desktop sidebar */}
+        {/* Desktop config sidebar */}
         <div
           className={`hidden shrink-0 border-r border-border bg-card transition-all duration-200 lg:block ${
             sidebarOpen ? "w-[300px]" : "w-0 overflow-hidden"
@@ -170,7 +181,7 @@ const Index = () => {
               >
                 {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
               </Button>
-              {/* Mobile sidebar */}
+              {/* Mobile config sidebar */}
               <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1.5 lg:hidden">
@@ -188,11 +199,51 @@ const Index = () => {
                 </p>
               </div>
             </div>
-            <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-              <Link to="/knowledge-base">
-                <Library className="h-3.5 w-3.5" /> Knowledge Base
-              </Link>
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {/* History toggle (desktop) */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryOpen((v) => !v)}
+                className="relative hidden h-8 gap-1.5 text-xs lg:flex"
+              >
+                <History className="h-3.5 w-3.5" />
+                Storico
+                {todayQueries > 0 && (
+                  <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground">
+                    {todayQueries}
+                  </span>
+                )}
+              </Button>
+              {/* History toggle (mobile) */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="relative h-8 gap-1.5 text-xs lg:hidden">
+                    <History className="h-3.5 w-3.5" />
+                    {todayQueries > 0 && (
+                      <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-semibold text-primary-foreground">
+                        {todayQueries}
+                      </span>
+                    )}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[340px] p-0">
+                  <HistoryPanel
+                    activeId={activeHistoryId}
+                    onSelect={(e) => {
+                      setAnswer(e.answer);
+                      setActiveHistoryId(e.id);
+                      setReadOnly(true);
+                    }}
+                  />
+                </SheetContent>
+              </Sheet>
+              <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <Link to="/knowledge-base">
+                  <Library className="h-3.5 w-3.5" /> Knowledge Base
+                </Link>
+              </Button>
+            </div>
           </div>
 
           <div className="mb-5 rounded-md border border-primary/20 bg-primary/5 px-4 py-2.5">
@@ -243,10 +294,33 @@ const Index = () => {
             </div>
           )}
 
+          {/* Read-only banner */}
+          {readOnly && answer && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+              <span className="text-foreground">
+                <span className="font-medium">Modalità lettura</span> · stai consultando una voce dello storico.
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs"
+                onClick={() => {
+                  setReadOnly(false);
+                  setAnswer(null);
+                  setActiveHistoryId(null);
+                }}
+              >
+                <X className="h-3.5 w-3.5" /> Nuova interrogazione
+              </Button>
+            </div>
+          )}
+
           {/* Ask */}
-          <div className="mb-5">
-            <AskBox onAsk={handleAsk} isLoading={loading} />
-          </div>
+          {!readOnly && (
+            <div className="mb-5">
+              <AskBox onAsk={handleAsk} isLoading={loading} />
+            </div>
+          )}
 
           {/* Answer / loading */}
           {loading && <AnswerSkeleton />}
@@ -277,6 +351,27 @@ const Index = () => {
             </div>
           </footer>
         </main>
+
+        {/* Right history sidebar (desktop) */}
+        <div
+          className={`hidden shrink-0 border-l border-border bg-card transition-all duration-200 lg:block ${
+            historyOpen ? "w-[320px]" : "w-0 overflow-hidden"
+          }`}
+        >
+          {historyOpen && (
+            <div className="sticky top-[57px] h-[calc(100vh-57px)]">
+              <HistoryPanel
+                activeId={activeHistoryId}
+                onSelect={(e) => {
+                  setAnswer(e.answer);
+                  setActiveHistoryId(e.id);
+                  setReadOnly(true);
+                }}
+                onClose={() => setHistoryOpen(false)}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
