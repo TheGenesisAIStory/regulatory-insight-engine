@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { FileStack, Layers, Cpu, Database, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { FileStack, Layers, Cpu, Database, PanelLeftClose, PanelLeft, Library } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { ConfigSidebar, AssistantConfig } from "@/components/ConfigSidebar";
 import { MetricCard } from "@/components/MetricCard";
@@ -187,6 +188,11 @@ const Index = () => {
                 </p>
               </div>
             </div>
+            <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+              <Link to="/knowledge-base">
+                <Library className="h-3.5 w-3.5" /> Knowledge Base
+              </Link>
+            </Button>
           </div>
 
           <div className="mb-5 rounded-md border border-primary/20 bg-primary/5 px-4 py-2.5">
