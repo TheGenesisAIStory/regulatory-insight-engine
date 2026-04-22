@@ -67,7 +67,7 @@ Evaluation reports fall into two groups:
 - Curated summaries: suitable for Git when they document a release decision.
 - Raw repeated run outputs: usually local-only unless needed for audit evidence.
 
-Current tracked Fiorell.IA evaluation reports are retained as beta evidence. Future repeated reports should be generated under ignored report directories or summarized into a smaller markdown release note.
+Current tracked Fiorell.IA markdown reports are retained as beta evidence. Raw repeated JSON reports under `fiorellia/eval/reports/` are local-only and ignored; summarize relevant findings into markdown when they are needed for review or release decisions.
 
 ## Cloud Sync Duplicates
 
