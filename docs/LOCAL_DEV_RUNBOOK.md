@@ -74,9 +74,22 @@ Backend checks:
 
 ```bash
 cd backend
-pytest
+if [ -x .venv/bin/python ]; then ./.venv/bin/python -m pytest; else python3 -m pytest; fi
 cd ..
 python3 -m py_compile backend/api.py backend/genisia_rag_engine.py backend/config.py backend/schemas.py
+```
+
+If `backend/.venv/bin/pytest` or `backend/.venv/bin/pip` points to an old repository path, recreate the backend virtual environment after stopping any running backend process:
+
+```bash
+cd backend
+deactivate 2>/dev/null || true
+rm -rf .venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m pytest
+cd ..
 ```
 
 ## Ollama
@@ -158,7 +171,7 @@ Do not publish a trained adapter until:
 git status -sb
 npm run test
 npm run build
-cd backend && pytest && cd ..
+cd backend && if [ -x .venv/bin/python ]; then ./.venv/bin/python -m pytest; else python3 -m pytest; fi && cd ..
 python3 -m py_compile backend/api.py backend/genisia_rag_engine.py backend/config.py backend/schemas.py
 ```
 
