@@ -41,3 +41,6 @@ training/data/output/
 *.njsproj
 *.sln
 *.sw?
+
+# Local virtual environments
+.venv*/

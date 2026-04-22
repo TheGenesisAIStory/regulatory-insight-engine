@@ -1,0 +1,12 @@
+# PyTorch is intentionally not pinned here.
+# Install PyTorch first with the official selector for your platform:
+# https://pytorch.org/get-started/locally/
+numpy<2
+transformers>=4.45,<5
+peft>=0.13,<0.18
+datasets>=2.20,<4
+accelerate>=0.33,<1
+pyyaml>=6.0
+
+# Optional for CUDA QLoRA / 4-bit loading where supported:
+# bitsandbytes

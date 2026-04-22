@@ -1,4 +1,4 @@
-# regulatory-insight-engine
+# Gen.Is.IA — Assistente AI per la Regolamentazione Bancaria regulatory-insight-engine
 
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Status: Experimental](https://img.shields.io/badge/status-experimental-orange)
 
