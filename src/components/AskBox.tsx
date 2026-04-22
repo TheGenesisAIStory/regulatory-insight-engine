@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent } from "react";
+import { useEffect, useState, KeyboardEvent } from "react";
 import { Send, Sparkles, CornerDownLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,14 @@ const SUGGESTIONS = [
 
 export const AskBox = ({ onAsk, isLoading, disabled, initialValue = "" }: AskBoxProps) => {
   const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    const prefill = sessionStorage.getItem("genisia.prefillQuestion");
+    if (prefill) {
+      setValue(prefill);
+      sessionStorage.removeItem("genisia.prefillQuestion");
+    }
+  }, []);
 
   const submit = () => {
     const q = value.trim();
