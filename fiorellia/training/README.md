@@ -42,6 +42,13 @@ Build a small, reviewed dataset focused on behavior. Start with 100-300 high-qua
 
 Run a small local LoRA only after prompt-only evaluation and dataset review. Keep artifacts local by default and record the run in the manifest.
 
+For cloud-first training on Colab, use:
+
+```text
+fiorellia/training/notebooks/fiorellia_lora_colab.ipynb
+fiorellia/training/cloud_training_colab.md
+```
+
 ### 5. Post-LoRA Evaluation
 
 Compare the candidate against the baseline and prompt-only runs. Reject the candidate if false answers increase, citations become weaker or out-of-scope refusals regress.
