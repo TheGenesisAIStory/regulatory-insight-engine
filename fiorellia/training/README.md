@@ -53,6 +53,14 @@ fiorellia/training/cloud_training_colab.md
 
 Compare the candidate against the baseline and prompt-only runs. Reject the candidate if false answers increase, citations become weaker or out-of-scope refusals regress.
 
+### 6. Colab Workflow Split
+
+- `fiorellia_lora_colab_ok.ipynb`: setup/serving/testing dell'adapter LoRA, utile per prompt manuali e debug del comportamento.
+- `fiorellia_eval_adapter2.ipynb`: eval completa su `fiorellia/eval/eval_set_v0.jsonl`, confronto baseline vs adapter e decisione GO / NO-GO.
+- `fiorellia/eval/prompt_harness_local_adapter.py`: script di riferimento per un eval locale diretto con base model + LoRA, da usare solo su host con GPU adeguata.
+- I file `prompt_harness_*.jsonl` e i CSV di confronto sono artefatti locali di eval.
+- Per default questi artefatti non vanno committati su GitHub.
+
 ## Dataset Categories
 
 Use these Fiorell.IA-specific categories alongside the shared supervised schema:

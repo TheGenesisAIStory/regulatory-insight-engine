@@ -57,6 +57,10 @@ Training prep
  - Training tooling is isolated in `training/` and exported artifacts live under `training/data/output`.
  - Training is optional and experimental; see `docs/TRAINING_PREP.md`.
  - Fiorell.IA is a documented local specialization track for Italian banking regulation; it remains decoupled from the production RAG runtime.
+ - `fiorellia_lora_colab_ok.ipynb` is the Colab notebook for LoRA setup/serving/testing.
+ - `fiorellia_eval_adapter2.ipynb` is the separate Colab notebook for full adapter eval and GO / NO-GO.
+ - `fiorellia/eval/prompt_harness_local_adapter.py` is the local reference script for direct base+LoRA eval on suitable hardware.
+ - Eval JSONL and CSV outputs are local artifacts and normally should not be committed to GitHub.
 
 Troubleshooting
  - See runtime runbook and evaluation docs above. Common issues: Ollama not running, missing models, cache mismatches after chunk changes.
