@@ -1,0 +1,56 @@
+# FiorellIA LoRA Behavior Config - Run 20260513
+# Generated: 2026-05-13
+# AGENTS.md compliant: no magic numbers, all params in EXPERIMENT dict equivalent
+
+run_id: fiorellia_behavior_20260513
+date: "2026-05-13"
+
+# Base model
+base_model: Qwen/Qwen2.5-0.5B-Instruct
+
+# Dataset
+dataset: supervised_v1_curated_20260421.jsonl
+dataset_split: walk_forward
+train_samples: 9
+val_samples: 2
+
+# LoRA hyperparameters
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules:
+  - q_proj
+  - v_proj
+
+# Training
+epochs: 3
+batch_size: 1
+gradient_accumulation_steps: 4
+learning_rate: 2.0e-4
+warmup_ratio: 0.03
+lr_scheduler: cosine
+max_seq_length: 512
+
+# Precision
+bf16: true
+fp16: false
+
+# Quantization (QLoRA)
+quantization: 4bit
+bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_quant_type: nf4
+use_nested_quant: false
+
+# Output
+output_dir: fiorellia/training/lora/fiorellia_behavior_20260513
+logging_steps: 1
+
+# Evaluation thresholds
+thresholds:
+  unsupported_abstention: 0.90
+  out_of_scope_refusal: 0.95
+  in_scope_grounded: 0.80
+
+# Results
+final_loss: 3.7390
+stage: first_successful_training
