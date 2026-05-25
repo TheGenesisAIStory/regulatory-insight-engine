@@ -1,5 +1,6 @@
-import { ShieldCheck, Wifi, WifiOff } from "lucide-react";
+import { ShieldCheck, WifiOff } from "lucide-react";
 import { StatusIndicator } from "./StatusIndicator";
+import { UserMenu } from "./UserMenu";
 
 interface AppHeaderProps {
   modelStatus: "online" | "offline" | "loading";
@@ -42,6 +43,8 @@ export const AppHeader = ({ modelStatus, indexStatus }: AppHeaderProps) => {
             label={indexStatus === "online" ? "Indice pronto" : "Indice incompleto"}
             detail="Knowledge base"
           />
+          <div className="hidden h-8 w-px bg-border sm:block" />
+          <UserMenu />
         </div>
       </div>
     </header>
