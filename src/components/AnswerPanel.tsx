@@ -20,6 +20,8 @@ export interface AnswerData {
   question: string;
   answer: string;
   confidence: "high" | "medium" | "low";
+  confidenceScore?: number;
+  abstentionScore?: number;
   sources: RetrievedSource[];
   generatedAt: string;
   model: string;
@@ -61,9 +63,29 @@ export const AnswerPanel = ({ data }: AnswerPanelProps) => {
             </div>
             <h2 className="line-clamp-2 text-sm font-medium text-foreground">{data.question}</h2>
           </div>
-          <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium", conf.tone)}>
-            {conf.label}
-          </span>
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            <span className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium", conf.tone)}>
+              {conf.label}
+              {typeof data.confidenceScore === "number" && (
+                <span className="ml-1 font-mono opacity-80">
+                  {(data.confidenceScore * 100).toFixed(0)}%
+                </span>
+              )}
+            </span>
+            {typeof data.abstentionScore === "number" && (
+              <span
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                  data.abstentionScore >= 0.5
+                    ? "border-destructive/25 bg-destructive/10 text-destructive"
+                    : "border-border bg-secondary text-muted-foreground",
+                )}
+                title="Probabilità di astensione del modello"
+              >
+                Astensione <span className="ml-1 font-mono">{(data.abstentionScore * 100).toFixed(0)}%</span>
+              </span>
+            )}
+          </div>
         </header>
 
         <div className="px-5 py-5">
