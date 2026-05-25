@@ -196,7 +196,7 @@ export const HistoryPanel = ({ activeId, onSelect, onClose }: HistoryPanelProps)
               </AlertDialogContent>
             </AlertDialog>
             <p className="mt-2 text-center text-[10px] text-muted-foreground">
-              Storico locale · TTL 90 giorni
+              Storico privato · sincronizzato sul tuo account
             </p>
           </footer>
         )}

@@ -16,6 +16,7 @@ import { mockDocs } from "@/data/mockData";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, askGenisia, GenisiaApiError, getDocuments, getReadiness, HealthResponse, rebuildIndex } from "@/lib/genisiaApi";
 import { todayCount, useHistoryStore } from "@/store/historyStore";
+import { useAuth } from "@/hooks/useAuth";
 
 
 const Index = () => {
@@ -39,7 +40,13 @@ const Index = () => {
 
   const addHistoryEntry = useHistoryStore((s) => s.addEntry);
   const historyEntries = useHistoryStore((s) => s.entries);
+  const loadHistory = useHistoryStore((s) => s.loadForUser);
   const todayQueries = todayCount(historyEntries);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    loadHistory(user?.id ?? null);
+  }, [user?.id, loadHistory]);
 
   const apiOnline = Boolean(health?.ollamaOnline);
   const usingRealDocs = apiDocs !== mockDocs;

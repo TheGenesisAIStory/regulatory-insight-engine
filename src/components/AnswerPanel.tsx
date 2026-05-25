@@ -1,8 +1,9 @@
-import { FileText, FileType2, FileDown, AlertTriangle, BookMarked, Quote, ChevronDown } from "lucide-react";
+import { FileText, FileDown, AlertTriangle, BookMarked, Quote, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { ExportPDF } from "./ExportPDF";
 
 export interface RetrievedSource {
   id: string;
@@ -106,9 +107,7 @@ export const AnswerPanel = ({ data }: AnswerPanelProps) => {
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleExport("PDF")}>
-                <FileType2 className="h-3.5 w-3.5" /> PDF
-              </Button>
+              <ExportPDF data={data} />
               <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => handleExport("DOCX")}>
                 <FileText className="h-3.5 w-3.5" /> DOCX
               </Button>
