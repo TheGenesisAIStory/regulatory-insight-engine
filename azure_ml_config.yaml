@@ -4,8 +4,8 @@ workspace_name: FIorellIA
 location: italynorth
 
 experiment_name: fiorellia-lora-release
-compute_name: fiorellia-gpu-italynorth
-compute_size: Standard_NC24ads_A100_v4
+compute_name: fiorellia-gpu-t4-italynorth
+compute_size: Standard_NC8as_T4_v3
 compute_min_instances: 0
 compute_max_instances: 1
 compute_idle_seconds: 120
@@ -24,7 +24,7 @@ model_name: fiorellia-qwen25-3b-lora
 endpoint_name: fiorellia-endpoint
 deployment_name: blue
 auth_mode: key
-instance_type: Standard_NC24ads_A100_v4
+instance_type: Standard_NC8as_T4_v3
 instance_count: 1
 public_network_access: enabled
 
