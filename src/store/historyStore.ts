@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AnswerData } from "@/components/AnswerPanel";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface HistoryEntry {
   id: string;
@@ -89,7 +90,7 @@ export const useHistoryStore = create<HistoryState>()((set, get) => ({
         id,
         user_id: user.id,
         question,
-        answer: answer as unknown as never,
+        answer: answer as unknown as Json,
         tags,
       });
     })();
