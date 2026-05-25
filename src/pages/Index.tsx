@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { mockDocs } from "@/data/mockData";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL, askGenisia, GenisiaApiError, getDocuments, getReadiness, HealthResponse, rebuildIndex } from "@/lib/genisiaApi";
+import { askFiorellIA, isFiorelliaConfigured, toAnswerData as fiorelliaToAnswer } from "@/lib/fiorelliaApi";
 import { todayCount, useHistoryStore } from "@/store/historyStore";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -104,7 +105,9 @@ const Index = () => {
     setReadOnly(false);
 
     try {
-      const data = await askGenisia(q, config.topK, config.model);
+      const data = isFiorelliaConfigured()
+        ? fiorelliaToAnswer(q, await askFiorellIA(q))
+        : await askGenisia(q, config.topK, config.model);
       setAnswer(data);
       const entry = addHistoryEntry(q, data);
       setActiveHistoryId(entry.id);
