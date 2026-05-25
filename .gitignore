@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist*.zip
 *.local
 .venv
 backend/.venv
@@ -30,6 +31,11 @@ fiorellia/eval/reports/**/*.json
 # Training exports and artifacts
 training/data/output/
 lockfile-backup-*/
+.artifacts/
+artifacts/
+azure_deploy_summary.json
+fiorellia_app_history.jsonl
+history_export_*.json
 
 # Pickle caches (embeddings/cache files should not be committed)
 *.pkl

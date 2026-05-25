@@ -1,0 +1,6 @@
+gradio>=4.44.0
+torch>=2.2
+transformers>=4.45.0
+peft>=0.13.0
+accelerate>=1.4.0
+safetensors>=0.4.5

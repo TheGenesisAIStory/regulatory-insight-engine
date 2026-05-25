@@ -1,0 +1,22 @@
+subscription_id: ${AZURE_SUBSCRIPTION_ID}
+resource_group: ${AZURE_RESOURCE_GROUP}
+workspace_name: ${AZURE_ML_WORKSPACE}
+
+experiment_name: fiorellia-lora-release
+compute_name: fiorellia-gpu
+compute_size: Standard_NC24ads_A100_v4
+compute_min_instances: 0
+compute_max_instances: 1
+
+training_config: fiorellia/training/configs/config_lora_behavior_20260421.yaml
+dataset_path: fiorellia/training/supervised_v1_curated_20260421.jsonl
+adapter_output_name: adapter
+
+model_name: fiorellia-qwen25-3b-lora
+endpoint_name: fiorellia-qwen25-lora
+deployment_name: blue
+auth_mode: key
+instance_type: Standard_NC24ads_A100_v4
+instance_count: 1
+
+deploy_summary_path: azure_deploy_summary.json

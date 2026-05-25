@@ -1,0 +1,14 @@
+name: fiorellia-azure-inference
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - torch>=2.2
+      - transformers>=4.45.0
+      - peft>=0.13.0
+      - accelerate>=1.4.0
+      - datasets>=2.20.0
+      - pyyaml>=6.0.0
+      - safetensors>=0.4.5

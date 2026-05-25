@@ -27,6 +27,12 @@ La policy funzionale resta conservativa:
 - astenersi in modo esplicito se il supporto documentale non è sufficiente;
 - non inventare contenuti normativi, citazioni o riferimenti.
 
+Runbook release Azure/Gradio:
+
+```text
+docs/FIORELLIA_AZURE_RELEASE.md
+```
+
 ---
 
 ## Percorso consigliato per utenti non tecnici

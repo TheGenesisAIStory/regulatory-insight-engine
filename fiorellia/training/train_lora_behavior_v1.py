@@ -218,11 +218,27 @@ def load_model(config: dict[str, Any]) -> AutoModelForCausalLM:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Train Fiorell.IA behavior LoRA v1.")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument(
+        "--dataset-path",
+        type=Path,
+        default=None,
+        help="Optional dataset override, useful when Azure ML mounts the JSONL as a job input.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Optional adapter output override, useful when Azure ML captures a job output folder.",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
-    dataset_path = ROOT / config["dataset_path"]
-    output_dir = ROOT / config["output_dir"]
+    dataset_path = args.dataset_path or Path(config["dataset_path"])
+    if not dataset_path.is_absolute():
+        dataset_path = ROOT / dataset_path
+    output_dir = args.output_dir or Path(config["output_dir"])
+    if not output_dir.is_absolute():
+        output_dir = ROOT / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"config={args.config}")
