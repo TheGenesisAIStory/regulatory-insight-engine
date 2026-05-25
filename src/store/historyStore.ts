@@ -1,9 +1,6 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { v4 as uuid } from "uuid";
 import type { AnswerData } from "@/components/AnswerPanel";
-
-const TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+import { supabase } from "@/integrations/supabase/client";
 
 export interface HistoryEntry {
   id: string;
@@ -15,13 +12,14 @@ export interface HistoryEntry {
 
 interface HistoryState {
   entries: HistoryEntry[];
+  loading: boolean;
+  loadForUser: (userId: string | null) => Promise<void>;
   addEntry: (question: string, answer: AnswerData) => HistoryEntry;
-  removeEntry: (id: string) => void;
-  clearAll: () => void;
-  pruneExpired: () => void;
+  removeEntry: (id: string) => Promise<void>;
+  clearAll: () => Promise<void>;
+  reset: () => void;
 }
 
-// Regex matchers for regulatory references → tags
 const TAG_PATTERNS: Array<{ re: RegExp; tag: (m: RegExpMatchArray) => string }> = [
   { re: /\bIFRS\s*9\b/gi, tag: () => "IFRS9" },
   { re: /\bBasel\s*(III|IV)\b/gi, tag: (m) => `Basel ${m[1].toUpperCase()}` },
@@ -41,48 +39,79 @@ export const extractTags = (text: string): string[] => {
   for (const { re, tag } of TAG_PATTERNS) {
     const r = new RegExp(re.source, re.flags);
     let m: RegExpExecArray | null;
-    while ((m = r.exec(text)) !== null) {
-      tags.add(tag(m));
-    }
+    while ((m = r.exec(text)) !== null) tags.add(tag(m));
   }
   return Array.from(tags).slice(0, 6);
 };
 
-export const useHistoryStore = create<HistoryState>()(
-  persist(
-    (set, get) => ({
-      entries: [],
-      addEntry: (question, answer) => {
-        const sourceText = answer.sources.map((s) => `${s.document} ${s.reference}`).join(" ");
-        const entry: HistoryEntry = {
-          id: uuid(),
-          timestamp: Date.now(),
-          question,
-          answer,
-          tags: extractTags(`${question}\n${answer.answer}\n${sourceText}`),
-        };
-        set({ entries: [entry, ...get().entries] });
-        return entry;
-      },
-      removeEntry: (id) => set({ entries: get().entries.filter((e) => e.id !== id) }),
-      clearAll: () => set({ entries: [] }),
-      pruneExpired: () => {
-        const cutoff = Date.now() - TTL_MS;
-        set({ entries: get().entries.filter((e) => e.timestamp >= cutoff) });
-      },
-    }),
-    {
-      name: "genisia.history.v1",
-      storage: createJSONStorage(() => localStorage),
-      onRehydrateStorage: () => (state) => {
-        state?.pruneExpired();
-      },
-    },
-  ),
-);
+export const useHistoryStore = create<HistoryState>()((set, get) => ({
+  entries: [],
+  loading: false,
+  reset: () => set({ entries: [], loading: false }),
+
+  loadForUser: async (userId) => {
+    if (!userId) {
+      set({ entries: [], loading: false });
+      return;
+    }
+    set({ loading: true });
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("id, question, answer, tags, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      set({ loading: false });
+      return;
+    }
+    const entries: HistoryEntry[] = (data ?? []).map((row) => ({
+      id: row.id,
+      question: row.question,
+      answer: row.answer as unknown as AnswerData,
+      tags: row.tags ?? [],
+      timestamp: new Date(row.created_at).getTime(),
+    }));
+    set({ entries, loading: false });
+  },
+
+  addEntry: (question, answer) => {
+    const sourceText = answer.sources.map((s) => `${s.document} ${s.reference}`).join(" ");
+    const tags = extractTags(`${question}\n${answer.answer}\n${sourceText}`);
+    const id = crypto.randomUUID();
+    const entry: HistoryEntry = { id, question, answer, tags, timestamp: Date.now() };
+    set({ entries: [entry, ...get().entries] });
+
+    // Fire-and-forget DB insert
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from("conversations").insert({
+        id,
+        user_id: user.id,
+        question,
+        answer: answer as unknown as never,
+        tags,
+      });
+    })();
+
+    return entry;
+  },
+
+  removeEntry: async (id) => {
+    set({ entries: get().entries.filter((e) => e.id !== id) });
+    await supabase.from("conversations").delete().eq("id", id);
+  },
+
+  clearAll: async () => {
+    const ids = get().entries.map((e) => e.id);
+    set({ entries: [] });
+    if (ids.length > 0) {
+      await supabase.from("conversations").delete().in("id", ids);
+    }
+  },
+}));
 
 // ---------- Date grouping helpers ----------
-
 export type HistoryGroup = "Oggi" | "Ieri" | "Ultimi 7 giorni" | "Più vecchi";
 
 const startOfDay = (d: Date) => {
