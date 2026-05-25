@@ -43,6 +43,30 @@ export AZURE_ML_WORKSPACE="<workspace-name>"
    - write `azure_deploy_summary.json`.
 4. Copy `azure_deploy_summary.json` to the Google Drive project folder only through the approved secure channel.
 
+## Azure ML One-Command Launcher
+
+The repository also includes `launch_azure_train.py`, configured for the `FIorellIA` workspace in `italynorth`.
+
+Install launcher dependencies in the VS Code Python environment:
+
+```bash
+python3 -m pip install -r requirements-azure-ml.txt
+```
+
+Dry-run the local preparation without contacting Azure:
+
+```bash
+python3 launch_azure_train.py --dry-run
+```
+
+Submit the final training job and deploy `fiorellia-endpoint` after a completed run:
+
+```bash
+python3 launch_azure_train.py
+```
+
+The launcher prepares `fiorellia/training/supervised_v1_curated_20260421_style_abstention_patch.jsonl` at about 40% abstention/refusal rows, logs MLflow metrics in Azure ML, writes `azure_deploy_summary.json`, and leaves endpoint keys out of Git.
+
 ## Gradio App
 
 Run:

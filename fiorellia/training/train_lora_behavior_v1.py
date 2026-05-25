@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
+import os
 import random
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,75 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
                 raise ValueError(f"Missing messages at {path}:{line_no}")
             records.append(record)
     return records
+
+
+def _try_start_mlflow_run(
+    config: dict[str, Any],
+    config_path: Path,
+    dataset_path: Path,
+    output_dir: Path,
+) -> Any | None:
+    enabled = os.environ.get("FIORELLIA_REPORT_TO_MLFLOW", "1").lower() not in {"0", "false", "no"}
+    if not enabled:
+        return None
+    try:
+        import mlflow
+    except Exception as exc:
+        print(f"mlflow_unavailable={exc}")
+        return None
+
+    experiment_name = os.environ.get("MLFLOW_EXPERIMENT_NAME") or config.get("mlflow_experiment_name")
+    if experiment_name:
+        mlflow.set_experiment(str(experiment_name))
+    run_name = os.environ.get("MLFLOW_RUN_NAME") or config.get("run_id") or output_dir.name
+    if mlflow.active_run() is None:
+        mlflow.start_run(run_name=str(run_name))
+    mlflow.log_params(
+        {
+            "config_path": str(config_path),
+            "dataset_path": str(dataset_path),
+            "output_dir": str(output_dir),
+            "base_model_name": config["base_model_name"],
+            "lora_r": int(config["lora_r"]),
+            "lora_alpha": int(config["lora_alpha"]),
+            "lora_dropout": float(config["lora_dropout"]),
+            "learning_rate": float(config["learning_rate"]),
+            "num_train_epochs": float(config["num_train_epochs"]),
+            "max_seq_length": int(config["max_seq_length"]),
+        }
+    )
+    return mlflow
+
+
+def _category(record: dict[str, Any]) -> str:
+    return str(record.get("category") or "").lower().replace("-", "_")
+
+
+def _log_dataset_metrics(mlflow_module: Any | None, records: list[dict[str, Any]]) -> None:
+    if mlflow_module is None:
+        return
+    total = max(1, len(records))
+    italian = sum(1 for record in records if str(record.get("lang") or "").lower() == "it")
+    unsupported = sum(1 for record in records if "unsupported" in _category(record) or "abstention" in _category(record))
+    out_of_scope = sum(1 for record in records if "out_of_scope" in _category(record) or "refusal" in _category(record))
+    mlflow_module.log_metrics(
+        {
+            "training_records_total": float(len(records)),
+            "italian_style": italian / total,
+            "unsupported_abstention": unsupported / total,
+            "out_of_scope_refusal": out_of_scope / total,
+            "abstention_ratio": (unsupported + out_of_scope) / total,
+        }
+    )
+
+
+def _log_metric(mlflow_module: Any | None, name: str, value: Any, step: int | None = None) -> None:
+    if mlflow_module is None:
+        return
+    try:
+        mlflow_module.log_metric(name, float(value), step=step)
+    except Exception as exc:
+        print(f"mlflow_metric_skipped={name}:{exc}")
 
 
 def render_chat(tokenizer: AutoTokenizer, messages: list[dict[str, str]]) -> str:
@@ -89,6 +159,7 @@ def train_cpu_loop(
     eval_dataset: Dataset | None,
     config: dict[str, Any],
     output_dir: Path,
+    mlflow_module: Any | None = None,
 ) -> None:
     print("CPU loop enabled: bypassing Trainer/Accelerate device wrapping.")
     model = model.to("cpu")
@@ -140,6 +211,8 @@ def train_cpu_loop(
                 if global_step % logging_steps == 0 or global_step == 1:
                     avg_loss = running_loss / batch_index
                     print(f"epoch={epoch + 1} step={global_step} train_loss={avg_loss:.6f}")
+                    _log_metric(mlflow_module, "loss", avg_loss, global_step)
+                    _log_metric(mlflow_module, "train_loss", avg_loss, global_step)
 
         if eval_loader is not None:
             model.eval()
@@ -148,7 +221,9 @@ def train_cpu_loop(
                 for eval_batch in eval_loader:
                     eval_batch = {key: value.to("cpu") for key, value in eval_batch.items()}
                     eval_loss += float(model(**eval_batch).loss.detach().cpu())
-            print(f"epoch={epoch + 1} eval_loss={eval_loss / max(1, len(eval_loader)):.6f}")
+            eval_avg_loss = eval_loss / max(1, len(eval_loader))
+            print(f"epoch={epoch + 1} eval_loss={eval_avg_loss:.6f}")
+            _log_metric(mlflow_module, "eval_loss", eval_avg_loss, global_step)
             model.train()
 
         save_cpu_checkpoint(model, tokenizer, output_dir, f"checkpoint-epoch-{epoch + 1}")
@@ -251,6 +326,8 @@ def main() -> int:
         tokenizer.pad_token = tokenizer.eos_token
 
     records = load_jsonl(dataset_path)
+    mlflow_module = _try_start_mlflow_run(config, args.config, dataset_path, output_dir)
+    _log_dataset_metrics(mlflow_module, records)
     train_records, eval_records = split_records(
         records,
         seed=int(config.get("seed", 42)),
@@ -278,13 +355,17 @@ def main() -> int:
     )
     model = get_peft_model(model, lora_config)
     allow_mps = bool(config.get("allow_mps", False))
-    if not allow_mps:
+    has_cuda = torch.cuda.is_available()
+    if not has_cuda and not allow_mps:
         model = model.to("cpu")
-        print("CPU device guard: allow_mps=false, keeping PEFT model on CPU.")
+        print("CPU device guard: CUDA unavailable and allow_mps=false, keeping PEFT model on CPU.")
     model.print_trainable_parameters()
 
-    if not allow_mps and not torch.cuda.is_available():
-        train_cpu_loop(model, tokenizer, train_dataset, eval_dataset, config, output_dir)
+    if not has_cuda and not allow_mps:
+        train_cpu_loop(model, tokenizer, train_dataset, eval_dataset, config, output_dir, mlflow_module)
+        if mlflow_module is not None:
+            mlflow_module.log_param("saved_adapter", str(output_dir))
+            mlflow_module.end_run()
         return 0
 
     training_kwargs: dict[str, Any] = {
@@ -301,13 +382,13 @@ def main() -> int:
         "bf16": torch.cuda.is_available(),
         "fp16": False,
         "dataloader_pin_memory": False,
-        "report_to": [],
+        "report_to": ["mlflow"] if mlflow_module is not None else [],
         "remove_unused_columns": False,
         "seed": int(config.get("seed", 42)),
     }
     eval_value = config.get("eval_strategy", "no") if eval_dataset is not None else "no"
     training_signature = inspect.signature(TrainingArguments)
-    if not allow_mps:
+    if not has_cuda and not allow_mps:
         if "use_cpu" in training_signature.parameters:
             training_kwargs["use_cpu"] = True
         if "no_cuda" in training_signature.parameters:
@@ -319,7 +400,7 @@ def main() -> int:
     else:
         training_kwargs["evaluation_strategy"] = eval_value
     training_args = TrainingArguments(**training_kwargs)
-    if not allow_mps:
+    if not has_cuda and not allow_mps:
         try:
             training_args.device = torch.device("cpu")
         except Exception:
@@ -333,10 +414,18 @@ def main() -> int:
         eval_dataset=eval_dataset,
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
-    trainer.train()
+    train_result = trainer.train()
+    if mlflow_module is not None:
+        for metric_name, metric_value in train_result.metrics.items():
+            _log_metric(mlflow_module, metric_name, metric_value)
+        if "train_loss" in train_result.metrics:
+            _log_metric(mlflow_module, "loss", train_result.metrics["train_loss"])
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
     print(f"saved_adapter={output_dir}")
+    if mlflow_module is not None:
+        mlflow_module.log_param("saved_adapter", str(output_dir))
+        mlflow_module.end_run()
     return 0
 
 
