@@ -232,7 +232,7 @@ def has_source_reference(text: Any) -> bool:
 
 
 def infer_output_text(row: Mapping[str, Any]) -> str:
-    for col in ["adapter_output", "model_output", "prediction", "response", "generated_text", "answer", "output"]:
+    for col in ["adapter_output", "model_answer", "model_output", "prediction", "response", "generated_text", "answer", "output"]:
         if col in row and row[col] is not None:
             return normalize_text(row[col])
     return ""

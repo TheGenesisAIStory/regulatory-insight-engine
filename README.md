@@ -27,7 +27,13 @@ La policy funzionale resta conservativa:
 - astenersi in modo esplicito se il supporto documentale non è sufficiente;
 - non inventare contenuti normativi, citazioni o riferimenti.
 
-Runbook release Azure/Gradio:
+Runbook attivo Fiorell.IA Colab A100:
+
+```text
+docs/FIORELLIA_COLAB_A100_RUNBOOK.md
+```
+
+Runbook Azure/Gradio legacy, non attivo per il training finale perché la subscription Azure for Students non ha quota GPU:
 
 ```text
 docs/FIORELLIA_AZURE_RELEASE.md
