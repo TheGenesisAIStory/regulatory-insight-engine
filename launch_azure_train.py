@@ -213,7 +213,7 @@ def azure_imports() -> dict[str, Any]:
             ManagedOnlineEndpoint,
             Model,
         )
-        from azure.identity import DefaultAzureCredential
+        from azure.identity import DefaultAzureCredential, DeviceCodeCredential
     except ImportError as exc:
         raise SystemExit(
             "Azure ML dependencies are missing. Install them with:\n"
@@ -226,6 +226,7 @@ def azure_imports() -> dict[str, Any]:
         "AssetTypes": AssetTypes,
         "CodeConfiguration": CodeConfiguration,
         "DefaultAzureCredential": DefaultAzureCredential,
+        "DeviceCodeCredential": DeviceCodeCredential,
         "Environment": Environment,
         "Input": Input,
         "ManagedOnlineDeployment": ManagedOnlineDeployment,
@@ -237,8 +238,13 @@ def azure_imports() -> dict[str, Any]:
     }
 
 
-def build_ml_client(config: dict[str, Any], modules: dict[str, Any]) -> Any:
-    credential = modules["DefaultAzureCredential"](exclude_interactive_browser_credential=False)
+def build_ml_client(config: dict[str, Any], modules: dict[str, Any], auth_method: str) -> Any:
+    if auth_method == "device-code":
+        credential = modules["DeviceCodeCredential"](tenant_id=config.get("tenant_id"))
+    elif auth_method == "default":
+        credential = modules["DefaultAzureCredential"](exclude_interactive_browser_credential=True)
+    else:
+        credential = modules["DefaultAzureCredential"](exclude_interactive_browser_credential=False)
     return modules["MLClient"](
         credential=credential,
         subscription_id=str(config["subscription_id"]),
@@ -454,6 +460,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-wait", action="store_true", help="Submit the training job and return immediately.")
     parser.add_argument("--no-deploy", action="store_true", help="Do not deploy the managed endpoint after the training job completes.")
     parser.add_argument("--allow-location-mismatch", action="store_true", help="Do not fail if the workspace region differs from config.location.")
+    parser.add_argument(
+        "--auth-method",
+        choices=["device-code", "default", "browser"],
+        default=os.environ.get("FIORELLIA_AZURE_AUTH", "device-code"),
+        help="Azure authentication method. device-code is terminal-friendly; browser opens a local redirect server.",
+    )
     return parser.parse_args()
 
 
@@ -469,7 +481,7 @@ def main() -> int:
         return 0
 
     modules = azure_imports()
-    ml_client = build_ml_client(config, modules)
+    ml_client = build_ml_client(config, modules, auth_method=args.auth_method)
     validate_workspace_region(ml_client, config, allow_mismatch=args.allow_location_mismatch)
     ensure_compute(ml_client, config, modules)
     job = submit_training_job(ml_client, config, modules, wait=not args.no_wait)
