@@ -14,6 +14,18 @@ Do not use managed cloud endpoints, external VMs, or non-Drive artifact stores f
 - Normative corpus root: `/content/drive/MyDrive/regulatory-insight-engine/docs/normativa/`.
 - `RUN_ENV = "colab"` remains the default in notebook config cells.
 
+## Drive-First Bootstrap
+
+All active Fiorell.IA notebooks start with a `00 - Fiorell.IA Drive-first bootstrap` cell. The cell always resolves the operational root to Drive, downloads `fiorellia_colab_drive_bootstrap.py` from GitHub if missing, and then executes it.
+
+The bootstrap:
+
+- mounts Google Drive when needed;
+- sets `REPO_ROOT = /content/drive/MyDrive/regulatory-insight-engine`;
+- sets `ARTIFACT_DIR = /content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest`;
+- refreshes stale critical scripts from GitHub, including `final_colab_certification.py` and `fiorellia_colab_cell04_hotfix.py`;
+- creates stable aliases and `__init__.py` files required by Colab imports.
+
 ## Permanent Repo Fixes
 
 The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink workarounds are no longer needed:

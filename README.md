@@ -46,6 +46,8 @@ Notebook operativo per VS Code collegato a Colab A100:
 fiorellia_final_colab_a100_release.ipynb
 ```
 
+Tutti i notebook Fiorell.IA attivi contengono una cella iniziale `00 - Fiorell.IA Drive-first bootstrap`, che forza il lavoro sulla root Drive e aggiorna automaticamente gli script critici se la copia Drive risulta mancante o stale.
+
 Il flusso operativo Fiorell.IA attivo è solo Colab/Drive-first. Eventuali file storici di deployment cloud restano fuori dal percorso di training, eval e rilascio finale.
 
 ---
