@@ -65,6 +65,12 @@ Script unico per training finale, eval, app test e verdict:
 fiorellia/training/final_colab_certification.py
 ```
 
+Root Drive operativa usata dal runner e dal notebook:
+
+```text
+/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest
+```
+
 Notebook operativo equivalente per VS Code collegato a Colab A100:
 
 ```text

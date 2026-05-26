@@ -14,6 +14,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+try:
+    import yaml  # noqa: F401
+except ModuleNotFoundError:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyyaml>=6.0"], check=True)
+
 from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
     infer_output_text,
     read_jsonl,
@@ -39,11 +44,27 @@ FINAL_THRESHOLDS = {
     "italian_style": 0.95,
 }
 PRIORITY_CASES = {"fio-v0-006", "fio-v0-009", "fio-v0-010", "fio-v0-016"}
+MAC_DRIVE_REPO_ROOT = Path(
+    "/Users/itsgennymac/Library/CloudStorage/GoogleDrive-sfn.gns@gmail.com/Il mio Drive/regulatory-insight-engine"
+)
 
 
 def drive_root() -> Path | None:
     root = Path("/content/drive/MyDrive")
     return root if root.exists() else None
+
+
+def drive_repo_root() -> Path | None:
+    env_root = os.getenv("FIORELLIA_DRIVE_REPO_ROOT")
+    candidates = [
+        Path(env_root).expanduser() if env_root else None,
+        Path("/content/drive/MyDrive/regulatory-insight-engine"),
+        MAC_DRIVE_REPO_ROOT,
+    ]
+    for candidate in candidates:
+        if candidate is not None and candidate.exists():
+            return candidate
+    return None
 
 
 def mount_drive_if_colab() -> None:
@@ -55,6 +76,9 @@ def mount_drive_if_colab() -> None:
 
 
 def default_artifact_dir() -> Path:
+    drive_repo = drive_repo_root()
+    if drive_repo is not None:
+        return drive_repo / "fiorellia-runs" / "final_delivery_latest"
     drive = drive_root()
     if drive is not None:
         return drive / "fiorellia-runs" / "final_delivery_latest"

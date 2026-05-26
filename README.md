@@ -33,6 +33,13 @@ Runbook attivo Fiorell.IA Colab A100:
 docs/FIORELLIA_COLAB_A100_RUNBOOK.md
 ```
 
+Root operativa Drive per lavoro locale e Colab:
+
+```text
+/Users/itsgennymac/Library/CloudStorage/GoogleDrive-sfn.gns@gmail.com/Il mio Drive/regulatory-insight-engine
+/content/drive/MyDrive/regulatory-insight-engine
+```
+
 Notebook operativo per VS Code collegato a Colab A100:
 
 ```text
