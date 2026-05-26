@@ -7,6 +7,7 @@ Do not use managed cloud endpoints, external VMs, or non-Drive artifact stores f
 ## Required Colab State
 
 - Runtime: Google Colab Pro, A100 GPU, high RAM.
+- TPU/TCU runtimes are not valid for this release path: `nvidia-smi` must exist and `torch.cuda.is_available()` must be `True`.
 - Repo/source root: `/content/drive/MyDrive/regulatory-insight-engine`.
 - Local Mac Drive source root: `/Users/itsgennymac/Library/CloudStorage/GoogleDrive-sfn.gns@gmail.com/Il mio Drive/regulatory-insight-engine`.
 - Drive artifact root: `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest/`.
