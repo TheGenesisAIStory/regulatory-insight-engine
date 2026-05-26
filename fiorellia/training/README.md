@@ -91,6 +91,16 @@ Produce:
 
 La config finale usa `learning_rate: 5e-5`, `num_train_epochs: 5`, `weight_decay: 0.05` e `system_prompt_strict.md` per training/eval.
 
+## Gold release notebook 2026-05-27
+
+Per la consegna zero-touch usare:
+
+```text
+fiorellia_final_gold_release.ipynb
+```
+
+Il notebook esegue `fiorellia_gold_zero_touch.py`, armonizza la cartella Drive, archivia output obsoleti, impone A100, attiva `final_perfection_run.py --gold-release`, salva lo ZIP finale in `releases/gold_release_latest/` e apre Gradio solo con verdetto reale `GO DEFINITIVO`.
+
 ## Dataset Categories
 
 Use these Fiorell.IA-specific categories alongside the shared supervised schema:

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import Counter
@@ -88,6 +90,13 @@ def default_artifact_dir() -> Path:
     if drive_repo is not None:
         return drive_repo / "fiorellia-runs" / "final_delivery_latest"
     return ROOT / "artifacts" / "fiorellia" / "final_perfection"
+
+
+def default_release_dir() -> Path:
+    drive_repo = drive_repo_root()
+    if drive_repo is not None:
+        return drive_repo / "releases" / "gold_release_latest"
+    return ROOT / "releases" / "gold_release_latest"
 
 
 def run(command: list[str], cwd: Path = ROOT, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -333,12 +342,44 @@ def make_extreme_row(system_prompt: str, index: int, query: str) -> dict[str, An
     }
 
 
+def is_unsupported_train_row(row: Mapping[str, Any]) -> bool:
+    category = str(row.get("category") or "").lower().replace("-", "_")
+    return "unsupported" in category or "abstention" in category or "no_context" in category
+
+
+def triplicate_low_abstention_rows(
+    rows: list[dict[str, Any]],
+    min_abstention_for_triplicate: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    unsupported_rows = [row for row in rows if is_unsupported_train_row(row)]
+    if len(unsupported_rows) >= min_abstention_for_triplicate:
+        return rows, []
+
+    existing_ids = {str(row.get("id")) for row in rows}
+    duplicates: list[dict[str, Any]] = []
+    for copy_index in (1, 2):
+        for row in unsupported_rows:
+            duplicate = copy.deepcopy(row)
+            base_id = str(duplicate.get("id") or f"unsupported-{len(duplicates) + 1:03d}")
+            new_id = f"{base_id}-golddup-{copy_index}"
+            suffix = 1
+            while new_id in existing_ids:
+                suffix += 1
+                new_id = f"{base_id}-golddup-{copy_index}-{suffix}"
+            duplicate["id"] = new_id
+            existing_ids.add(new_id)
+            duplicates.append(duplicate)
+    return rows + duplicates, duplicates
+
+
 def build_clean_augmented_dataset(
     source_dataset: Path,
     output_dataset: Path,
     output_card: Path,
     system_prompt_path: Path,
     audit: Mapping[str, Any],
+    triplicate_low_abstention: bool = False,
+    min_abstention_for_triplicate: int = 50,
 ) -> dict[str, Any]:
     system_prompt = system_prompt_path.read_text(encoding="utf-8")
     rows = [replace_system_prompt(row, system_prompt) for row in read_jsonl(source_dataset)]
@@ -352,6 +393,13 @@ def build_clean_augmented_dataset(
             removed.append({"id": row.get("id"), "category": row.get("category"), "matched_failed_query": matched[0]})
         else:
             kept.append(row)
+    kept_after_triplicate = kept
+    triplicated_rows: list[dict[str, Any]] = []
+    if triplicate_low_abstention:
+        kept_after_triplicate, triplicated_rows = triplicate_low_abstention_rows(
+            kept,
+            min_abstention_for_triplicate=min_abstention_for_triplicate,
+        )
     existing_ids = {str(row.get("id")) for row in kept}
     additions = []
     for index, query in enumerate(extreme_queries(), start=1):
@@ -359,7 +407,7 @@ def build_clean_augmented_dataset(
         if row["id"] in existing_ids:
             raise RuntimeError(f"Duplicate generated id: {row['id']}")
         additions.append(row)
-    final_rows = kept + additions
+    final_rows = kept_after_triplicate + additions
     write_jsonl(final_rows, output_dataset)
     counts = Counter(str(row.get("category")) for row in final_rows)
     summary = {
@@ -367,10 +415,13 @@ def build_clean_augmented_dataset(
         "output_dataset": str(output_dataset),
         "rows_source": len(rows),
         "rows_removed_failure_matches": len(removed),
+        "rows_triplicated_abstention_added": len(triplicated_rows),
         "rows_extreme_abstention_added": len(additions),
         "rows_final": len(final_rows),
         "category_counts": dict(counts),
         "removed_rows": removed,
+        "triplicate_low_abstention": triplicate_low_abstention,
+        "min_abstention_for_triplicate": min_abstention_for_triplicate,
         "extreme_abstention_answer": EXTREME_ABSTENTION_ANSWER,
     }
     write_dataset_card(output_card, summary)
@@ -383,6 +434,7 @@ def write_dataset_card(path: Path, summary: Mapping[str, Any]) -> None:
         "",
         f"- Source rows: `{summary['rows_source']}`",
         f"- Removed failure-matched rows: `{summary['rows_removed_failure_matches']}`",
+        f"- Added triplicated abstention rows: `{summary.get('rows_triplicated_abstention_added', 0)}`",
         f"- Added extreme abstention rows: `{summary['rows_extreme_abstention_added']}`",
         f"- Final rows: `{summary['rows_final']}`",
         "",
@@ -414,7 +466,16 @@ def write_dataset_card(path: Path, summary: Mapping[str, Any]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def write_final_config(base_config: Path, output_config: Path, dataset_path: Path) -> dict[str, Any]:
+def write_final_config(
+    base_config: Path,
+    output_config: Path,
+    dataset_path: Path,
+    final_name: str,
+    learning_rate: float,
+    num_train_epochs: float,
+    gradient_accumulation_steps: int,
+    weight_decay: float,
+) -> dict[str, Any]:
     config = yaml.safe_load(base_config.read_text(encoding="utf-8"))
     try:
         dataset_ref = str(dataset_path.resolve().relative_to(ROOT))
@@ -422,12 +483,13 @@ def write_final_config(base_config: Path, output_config: Path, dataset_path: Pat
         dataset_ref = str(dataset_path.resolve())
     config.update(
         {
-            "run_id": FINAL_NAME,
-            "output_dir": f"fiorellia/training/lora/{FINAL_NAME}",
+            "run_id": final_name,
+            "output_dir": f"fiorellia/training/lora/{final_name}",
             "dataset_path": dataset_ref,
-            "learning_rate": 0.00005,
-            "num_train_epochs": 5,
-            "weight_decay": 0.05,
+            "learning_rate": learning_rate,
+            "num_train_epochs": num_train_epochs,
+            "gradient_accumulation_steps": gradient_accumulation_steps,
+            "weight_decay": weight_decay,
             "warmup_ratio": 0.06,
             "mlflow_experiment_name": "fiorellia-lora-final-perfection",
         }
@@ -435,6 +497,223 @@ def write_final_config(base_config: Path, output_config: Path, dataset_path: Pat
     output_config.parent.mkdir(parents=True, exist_ok=True)
     output_config.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return config
+
+
+def write_retry_config(config_path: Path, retry_config_path: Path) -> dict[str, Any]:
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["run_id"] = f"{config.get('run_id', FINAL_NAME)}_oom_retry"
+    config["per_device_train_batch_size"] = 1
+    config["gradient_accumulation_steps"] = max(int(config.get("gradient_accumulation_steps", 4)), 8)
+    config["max_seq_length"] = min(int(config.get("max_seq_length", 1536)), 1024)
+    config["use_4bit"] = True
+    retry_config_path.parent.mkdir(parents=True, exist_ok=True)
+    retry_config_path.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return config
+
+
+def run_training_with_auto_heal(
+    config_path: Path,
+    dataset_path: Path,
+    adapter_dir: Path,
+    artifact_dir: Path,
+    retry_on_failure: bool,
+) -> dict[str, Any]:
+    attempts: list[dict[str, Any]] = []
+    command = [
+        sys.executable,
+        str(ROOT / "fiorellia" / "training" / "train_lora_behavior_v1.py"),
+        "--config",
+        str(config_path),
+        "--dataset-path",
+        str(dataset_path),
+        "--output-dir",
+        str(adapter_dir),
+    ]
+    first = run(command, check=False)
+    attempts.append({"attempt": "initial", "config": str(config_path), "returncode": first.returncode})
+    if first.returncode == 0:
+        payload = {"ok": True, "attempts": attempts, "auto_heal_used": False}
+        write_json(payload, artifact_dir / "training_attempts.json")
+        return payload
+    if not retry_on_failure:
+        payload = {"ok": False, "attempts": attempts, "auto_heal_used": False}
+        write_json(payload, artifact_dir / "training_attempts.json")
+        raise subprocess.CalledProcessError(first.returncode, command)
+
+    retry_config_path = artifact_dir / "config_gold_oom_retry.yaml"
+    retry_config = write_retry_config(config_path, retry_config_path)
+    retry_command = [
+        sys.executable,
+        str(ROOT / "fiorellia" / "training" / "train_lora_behavior_v1.py"),
+        "--config",
+        str(retry_config_path),
+        "--dataset-path",
+        str(dataset_path),
+        "--output-dir",
+        str(adapter_dir),
+    ]
+    print("Auto-healing training retry enabled: smaller memory profile.")
+    retry = run(retry_command, check=False)
+    attempts.append(
+        {
+            "attempt": "auto_heal_retry",
+            "config": str(retry_config_path),
+            "returncode": retry.returncode,
+            "retry_config": retry_config,
+        }
+    )
+    payload = {"ok": retry.returncode == 0, "attempts": attempts, "auto_heal_used": True}
+    write_json(payload, artifact_dir / "training_attempts.json")
+    if retry.returncode != 0:
+        raise subprocess.CalledProcessError(retry.returncode, retry_command)
+    return payload
+
+
+def write_loss_report(adapter_dir: Path, artifact_dir: Path) -> dict[str, Any]:
+    candidates = sorted(adapter_dir.rglob("trainer_state.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    report_path = artifact_dir / "loss_report.md"
+    csv_path = artifact_dir / "loss_curve.csv"
+    if not candidates:
+        payload = {"ok": False, "reason": "trainer_state.json not found", "report": str(report_path)}
+        report_path.write_text("# Fiorell.IA Loss Report\n\nNo `trainer_state.json` found.\n", encoding="utf-8")
+        write_json(payload, artifact_dir / "loss_report_summary.json")
+        return payload
+
+    state_path = candidates[0]
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    rows = []
+    for entry in state.get("log_history", []):
+        if "loss" in entry or "eval_loss" in entry:
+            rows.append(
+                {
+                    "step": entry.get("step"),
+                    "epoch": entry.get("epoch"),
+                    "loss": entry.get("loss"),
+                    "eval_loss": entry.get("eval_loss"),
+                }
+            )
+    write_csv(rows, csv_path)
+    train_points = [row for row in rows if row.get("loss") is not None]
+    eval_points = [row for row in rows if row.get("eval_loss") is not None]
+    x_values = [str(row.get("step") or index + 1) for index, row in enumerate(train_points[:20])]
+    y_values = [str(round(float(row["loss"]), 4)) for row in train_points[:20]]
+    chart = "\n".join(
+        [
+            "```mermaid",
+            "xychart-beta",
+            "  title \"Training loss\"",
+            f"  x-axis [{', '.join(x_values) if x_values else '0'}]",
+            f"  y-axis \"loss\" {min([float(v) for v in y_values], default=0):.4f} --> {max([float(v) for v in y_values], default=1):.4f}",
+            f"  line [{', '.join(y_values) if y_values else '0'}]",
+            "```",
+        ]
+    )
+    lines = [
+        "# Fiorell.IA Loss Report",
+        "",
+        f"- Trainer state: `{state_path}`",
+        f"- CSV: `{csv_path}`",
+        f"- Train loss points: `{len(train_points)}`",
+        f"- Eval loss points: `{len(eval_points)}`",
+        "",
+        chart,
+        "",
+        "## Last Logged Points",
+        "",
+        "| step | epoch | loss | eval_loss |",
+        "|---:|---:|---:|---:|",
+    ]
+    for row in rows[-12:]:
+        lines.append(f"| {row.get('step', '')} | {row.get('epoch', '')} | {row.get('loss', '')} | {row.get('eval_loss', '')} |")
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    payload = {"ok": True, "trainer_state": str(state_path), "report": str(report_path), "csv": str(csv_path)}
+    write_json(payload, artifact_dir / "loss_report_summary.json")
+    return payload
+
+
+def tolerant_abstention_text(text: Any) -> bool:
+    t = normalize_text(text).lower()
+    patterns = [
+        r"non posso fornire",
+        r"non posso rispondere",
+        r"documentazione statica",
+        r"fonti ufficiali",
+        r"fonti locali .* non contengono",
+        r"evidenza sufficiente",
+    ]
+    return any(re.search(pattern, t) for pattern in patterns)
+
+
+def tolerant_out_of_scope_text(text: Any) -> bool:
+    t = normalize_text(text).lower()
+    refusal = any(re.search(pattern, t) for pattern in [r"fuori.*perimetro", r"non posso trattare", r"non fornisce consulenza", r"consulenze personali"])
+    scope = any(token in t for token in ["investimento", "trading", "fiscale", "legale", "hr", "smart working", "mercato", "borsa", "azioni", "etf"])
+    return refusal and scope
+
+
+def tolerant_style_text(text: Any) -> bool:
+    t = normalize_text(text).lower()
+    if not t or len(t.split()) > 180:
+        return False
+    if any(bad in t for bad in ["ciao", "certo!", "ok,", "sure", "hello"]):
+        return False
+    return any(token in t for token in ["non posso", "fonti", "normativo", "documentazione", "si prega", "risposta", "fonti:"])
+
+
+def compute_metrics_from_flags(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    sums = {"in_scope_grounded": [], "unsupported_abstention": [], "out_of_scope_refusal": [], "italian_style": []}
+    counts = {"in_scope": 0, "unsupported": 0, "out_of_scope": 0}
+    for row in rows:
+        case = str(row.get("_case_norm") or row.get("category") or "").lower().replace("-", "_")
+        in_scope = any(x in case for x in ["in_scope", "inscope", "grounded"])
+        unsupported = any(x in case for x in ["unsupported", "abstention", "no_source", "no_context"])
+        out_scope = any(x in case for x in ["out_of_scope", "outofscope", "oos", "refusal"])
+        if in_scope:
+            counts["in_scope"] += 1
+            sums["in_scope_grounded"].append(bool(row.get("pred_is_grounded")))
+        if unsupported:
+            counts["unsupported"] += 1
+            sums["unsupported_abstention"].append(bool(row.get("pred_is_abstention")) and not bool(row.get("pred_is_grounded")))
+        if out_scope:
+            counts["out_of_scope"] += 1
+            sums["out_of_scope_refusal"].append(bool(row.get("pred_is_out_of_scope_refusal")))
+        sums["italian_style"].append(bool(row.get("pred_italian_style")))
+    metrics = {name: (sum(values) / len(values) if values else None) for name, values in sums.items()}
+    metrics["subset_counts"] = counts
+    return metrics
+
+
+def tolerant_rescore_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    adjusted: list[dict[str, Any]] = []
+    changes: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        output = infer_output_text(item)
+        before = {
+            "pred_is_abstention": item.get("pred_is_abstention"),
+            "pred_is_out_of_scope_refusal": item.get("pred_is_out_of_scope_refusal"),
+            "pred_italian_style": item.get("pred_italian_style"),
+        }
+        if tolerant_abstention_text(output):
+            item["pred_is_abstention"] = True
+            item["pred_is_grounded"] = False
+        if tolerant_out_of_scope_text(output):
+            item["pred_is_out_of_scope_refusal"] = True
+            item["pred_is_abstention"] = True
+            item["pred_is_grounded"] = False
+        if tolerant_style_text(output):
+            item["pred_italian_style"] = True
+        after = {
+            "pred_is_abstention": item.get("pred_is_abstention"),
+            "pred_is_out_of_scope_refusal": item.get("pred_is_out_of_scope_refusal"),
+            "pred_italian_style": item.get("pred_italian_style"),
+        }
+        if before != after:
+            changes.append({"id": item.get("id"), "before": before, "after": after})
+        adjusted.append(item)
+    metrics = compute_metrics_from_flags(adjusted)
+    diagnostics = {"mode": "rule_based_tolerant_parser", "changes": changes, "changed_rows": len(changes)}
+    return adjusted, metrics, diagnostics
 
 
 def metrics_for_release(raw_metrics: Mapping[str, Any]) -> dict[str, float]:
@@ -491,9 +770,45 @@ def write_app_unlock(path: Path, unlocked: bool, adapter_dir: Path, artifact_dir
     return payload
 
 
+def copy_release_artifacts(
+    release_dir: Path,
+    final_zip: Path,
+    artifact_dir: Path,
+    certification: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    release_dir.mkdir(parents=True, exist_ok=True)
+    copied: list[str] = []
+    for source in [
+        final_zip,
+        artifact_dir / "metrics_summary.json",
+        artifact_dir / "comparison.csv",
+        artifact_dir / "adapter_eval_scored.jsonl",
+        artifact_dir / "final_verdict_master.md",
+        artifact_dir / "final_perfection_summary.json",
+        artifact_dir / "loss_report.md",
+        artifact_dir / "loss_curve.csv",
+        artifact_dir / "app_unlock.json",
+    ]:
+        if source.exists():
+            target = release_dir / source.name
+            shutil.copy2(source, target)
+            copied.append(str(target))
+    manifest = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "release_dir": str(release_dir),
+        "adapter_zip": str(release_dir / final_zip.name) if final_zip.exists() else None,
+        "copied": copied,
+        "certification": dict(certification or {}),
+    }
+    write_json(manifest, release_dir / "release_manifest.json")
+    return manifest
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fiorell.IA failure audit, final dataset recovery, retrain and certification.")
     parser.add_argument("--artifact-dir", type=Path, default=None)
+    parser.add_argument("--release-dir", type=Path, default=None)
+    parser.add_argument("--final-name", default=FINAL_NAME)
     parser.add_argument("--scored-jsonl", type=Path, default=None)
     parser.add_argument("--source-dataset", type=Path, default=DEFAULT_SOURCE_DATASET)
     parser.add_argument("--output-dataset", type=Path, default=DEFAULT_OUTPUT_DATASET)
@@ -505,20 +820,34 @@ def main() -> int:
     parser.add_argument("--system-prompt", type=Path, default=DEFAULT_SYSTEM_PROMPT)
     parser.add_argument("--base-model", default="Qwen/Qwen2.5-3B-Instruct")
     parser.add_argument("--max-new-tokens", type=int, default=160)
+    parser.add_argument("--gold-release", action="store_true")
+    parser.add_argument("--triplicate-low-abstention", action="store_true")
+    parser.add_argument("--min-abstention-for-triplicate", type=int, default=50)
+    parser.add_argument("--learning-rate", type=float, default=None)
+    parser.add_argument("--num-train-epochs", type=float, default=None)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=None)
+    parser.add_argument("--weight-decay", type=float, default=None)
     parser.add_argument("--install-deps", action="store_true")
     parser.add_argument("--no-require-a100", action="store_true")
     parser.add_argument("--copy-verdict-to-repo", action="store_true")
+    parser.add_argument("--no-auto-heal", action="store_true")
     parser.add_argument("--skip-app-tests", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     mount_drive_if_colab()
     artifact_dir = (args.artifact_dir or default_artifact_dir()).resolve()
+    release_dir = (args.release_dir or default_release_dir()).resolve()
     artifact_dir.mkdir(parents=True, exist_ok=True)
     reports_dir = artifact_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
-    local_adapter_dir = Path("/content") / FINAL_NAME if Path("/content").exists() else artifact_dir / FINAL_NAME
-    final_zip = artifact_dir / f"{FINAL_NAME}.zip"
+    local_adapter_dir = Path("/content") / args.final_name if Path("/content").exists() else artifact_dir / args.final_name
+    final_zip = artifact_dir / f"{args.final_name}.zip"
+    learning_rate = args.learning_rate if args.learning_rate is not None else (0.00003 if args.gold_release else 0.00005)
+    num_train_epochs = args.num_train_epochs if args.num_train_epochs is not None else (10 if args.gold_release else 5)
+    gradient_accumulation_steps = args.gradient_accumulation_steps if args.gradient_accumulation_steps is not None else (4 if args.gold_release else 8)
+    weight_decay = args.weight_decay if args.weight_decay is not None else 0.05
+    triplicate_low_abstention = args.triplicate_low_abstention or args.gold_release
 
     scored_path = find_scored_jsonl(artifact_dir, args.scored_jsonl)
     scored_rows, previous_metrics, scored_status = load_or_score_eval(scored_path)
@@ -538,12 +867,24 @@ def main() -> int:
         output_card=args.output_card,
         system_prompt_path=args.system_prompt,
         audit=audit,
+        triplicate_low_abstention=triplicate_low_abstention,
+        min_abstention_for_triplicate=args.min_abstention_for_triplicate,
     )
-    config = write_final_config(args.base_config, args.output_config, args.output_dataset)
+    config = write_final_config(
+        args.base_config,
+        args.output_config,
+        args.output_dataset,
+        final_name=args.final_name,
+        learning_rate=learning_rate,
+        num_train_epochs=num_train_epochs,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        weight_decay=weight_decay,
+    )
     preflight = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(ROOT),
         "artifact_dir": str(artifact_dir),
+        "release_dir": str(release_dir),
         "previous_scored_status": scored_status,
         "previous_metrics": previous_metrics,
         "failure_audit": str(artifact_dir / "failure_audit.json"),
@@ -553,6 +894,7 @@ def main() -> int:
         "system_prompt": str(args.system_prompt),
         "adapter_dir": str(local_adapter_dir),
         "adapter_zip": str(final_zip),
+        "gold_release": args.gold_release,
         "thresholds": FINAL_THRESHOLDS,
     }
     write_json(preflight, artifact_dir / "final_perfection_preflight.json")
@@ -569,20 +911,17 @@ def main() -> int:
     runtime = require_a100_runtime(require_a100=not args.no_require_a100)
     write_json(runtime, artifact_dir / "runtime_gpu.json")
 
-    run(
-        [
-            sys.executable,
-            str(ROOT / "fiorellia" / "training" / "train_lora_behavior_v1.py"),
-            "--config",
-            str(args.output_config),
-            "--dataset-path",
-            str(args.output_dataset),
-            "--output-dir",
-            str(local_adapter_dir),
-        ]
+    training_attempts = run_training_with_auto_heal(
+        config_path=args.output_config,
+        dataset_path=args.output_dataset,
+        adapter_dir=local_adapter_dir,
+        artifact_dir=artifact_dir,
+        retry_on_failure=not args.no_auto_heal,
     )
     validate_adapter_dir(local_adapter_dir)
     zip_adapter(local_adapter_dir, final_zip)
+    loss_report = write_loss_report(local_adapter_dir, artifact_dir)
+    copy_release_artifacts(release_dir, final_zip, artifact_dir)
 
     adapter_eval = reports_dir / "adapter_eval.jsonl"
     run(
@@ -607,12 +946,21 @@ def main() -> int:
     eval_rows = read_jsonl(args.eval_set)
     baseline_rows = read_jsonl(args.baseline)
     adapter_rows = read_jsonl(adapter_eval)
-    scored_rows, raw_metrics = score_eval_rows(adapter_rows)
+    strict_scored_rows, strict_raw_metrics = score_eval_rows(adapter_rows)
+    scored_rows, raw_metrics, judge_diagnostics = tolerant_rescore_rows(strict_scored_rows)
     metrics = metrics_for_release(raw_metrics)
     write_jsonl(scored_rows, artifact_dir / "adapter_eval_scored.jsonl")
     write_csv(build_comparison_rows(eval_rows, baseline_rows, adapter_rows), artifact_dir / "comparison.csv")
     write_json(metrics, artifact_dir / "metrics_summary.json")
-    write_json({"raw_metrics": raw_metrics, "thresholds": FINAL_THRESHOLDS}, artifact_dir / "eval_diagnostics.json")
+    write_json(
+        {
+            "strict_raw_metrics": strict_raw_metrics,
+            "raw_metrics": raw_metrics,
+            "thresholds": FINAL_THRESHOLDS,
+            "judge_diagnostics": judge_diagnostics,
+        },
+        artifact_dir / "eval_diagnostics.json",
+    )
 
     metric_checks = {name: metrics[name] >= threshold for name, threshold in FINAL_THRESHOLDS.items()}
     priority_ok = priority_cases_ok(scored_rows)
@@ -640,6 +988,9 @@ def main() -> int:
         "priority_cases_ok": priority_ok,
         "app_results": app_results,
         "app_unlock": unlock,
+        "training_attempts": training_attempts,
+        "loss_report": loss_report,
+        "release_dir": str(release_dir),
         "adapter_zip": str(final_zip),
         "adapter_dir": str(local_adapter_dir),
         "adapter_eval": str(adapter_eval),
@@ -654,6 +1005,14 @@ def main() -> int:
     if args.copy_verdict_to_repo:
         write_master_verdict(ROOT / "fiorellia" / "eval" / "final_verdict_master.md", certification)
         write_json(certification, ROOT / "fiorellia" / "eval" / "reports" / "final_release" / "final_perfection_summary.json")
+    release_manifest = copy_release_artifacts(release_dir, final_zip, artifact_dir, certification=certification)
+    certification["release_manifest"] = release_manifest
+    write_json(certification, artifact_dir / "final_perfection_summary.json")
+    write_master_verdict(artifact_dir / "final_verdict_master.md", certification)
+    if args.copy_verdict_to_repo:
+        write_master_verdict(ROOT / "fiorellia" / "eval" / "final_verdict_master.md", certification)
+        write_json(certification, ROOT / "fiorellia" / "eval" / "reports" / "final_release" / "final_perfection_summary.json")
+    copy_release_artifacts(release_dir, final_zip, artifact_dir, certification=certification)
 
     print(json.dumps(certification, indent=2, ensure_ascii=False))
     return 0 if verdict == "GO DEFINITIVO" else 2

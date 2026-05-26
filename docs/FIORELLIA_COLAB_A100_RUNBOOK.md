@@ -72,6 +72,29 @@ The runner:
 
 `GO DEFINITIVO` is allowed only from the current run metrics and app smoke tests; previous `NO-GO` RuntimeErrors are ignored, but failed current metrics still keep the app locked.
 
+## Gold Release Notebook
+
+The zero-touch notebook is:
+
+```text
+fiorellia_final_gold_release.ipynb
+```
+
+Run it in Colab A100 with `Runtime -> Run all`. It executes `fiorellia_gold_zero_touch.py`, which:
+
+- mounts Drive;
+- harmonizes `/content/drive/MyDrive/regulatory-insight-engine`;
+- archives stale `metrics_summary*.json`, `final_verdict*.md`, `final_perfection_summary*.json` and app launch status files from `fiorellia-runs/final_delivery_latest/`;
+- refreshes critical scripts from GitHub without requiring a token;
+- verifies `nvidia-smi`, `torch.cuda.is_available()` and A100;
+- runs `final_perfection_run.py --gold-release`;
+- triplicates unsupported-abstention training examples when the clean source set has fewer than 50;
+- trains with `num_train_epochs=10`, `learning_rate=3e-5`, `gradient_accumulation_steps=4`;
+- retries once with a smaller memory profile if training fails;
+- writes `loss_report.md` and `loss_curve.csv`;
+- saves the adapter ZIP and release manifest in `/content/drive/MyDrive/regulatory-insight-engine/releases/gold_release_latest/`;
+- launches a public Gradio demo with preset buttons for Normativa, Fuori Ambito and Allucinazione only after a real `GO DEFINITIVO`.
+
 ## Permanent Repo Fixes
 
 The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink workarounds are no longer needed:

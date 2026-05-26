@@ -46,6 +46,14 @@ Notebook operativo per VS Code collegato a Colab A100:
 fiorellia_final_colab_a100_release.ipynb
 ```
 
+Notebook Gold Release zero-touch:
+
+```text
+fiorellia_final_gold_release.ipynb
+```
+
+Il notebook Gold monta Drive, armonizza `/content/drive/MyDrive/regulatory-insight-engine`, archivia i verdict obsoleti, verifica CUDA/A100, addestra con `num_train_epochs=10`, `learning_rate=3e-5`, `gradient_accumulation_steps=4`, salva lo ZIP in `releases/gold_release_latest/` e apre la demo Gradio solo dopo `GO DEFINITIVO` reale.
+
 Tutti i notebook Fiorell.IA attivi contengono una cella iniziale `00 - Fiorell.IA Drive-first bootstrap`, che forza il lavoro sulla root Drive e aggiorna automaticamente gli script critici se la copia Drive risulta mancante o stale.
 
 Il flusso operativo Fiorell.IA attivo è solo Colab/Drive-first. Eventuali file storici di deployment cloud restano fuori dal percorso di training, eval e rilascio finale.
