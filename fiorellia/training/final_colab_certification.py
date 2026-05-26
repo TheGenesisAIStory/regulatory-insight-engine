@@ -68,22 +68,29 @@ def drive_repo_root() -> Path | None:
 
 
 def mount_drive_if_colab() -> None:
-    if drive_root() is not None:
+    drive_path = Path("/content/drive/MyDrive")
+    if drive_path.exists():
+        print("Drive already available, skipping mount.")
         return
-    if os.getenv("FIORELLIA_SKIP_DRIVE_MOUNT") == "1":
-        return
-    try:
-        from IPython import get_ipython  # type: ignore
-    except Exception:
-        get_ipython = None  # type: ignore[assignment]
-    ipython = get_ipython() if get_ipython is not None else None  # type: ignore[operator]
-    if ipython is None or getattr(ipython, "kernel", None) is None:
-        return
+
     try:
         from google.colab import drive  # type: ignore
     except Exception:
+        print("google.colab non disponibile, skip mount.")
         return
-    drive.mount("/content/drive", force_remount=False)
+
+    try:
+        import IPython
+
+        if IPython.get_ipython() is None:
+            raise RuntimeError("No live IPython kernel available for interactive drive.mount()")
+    except Exception as exc:
+        raise RuntimeError(
+            "Google Drive non montato e mount interattivo impossibile da processo batch. "
+            "Monta Drive in una cella notebook prima di lanciare il runner."
+        ) from exc
+
+    drive.mount("/content/drive")
 
 
 def default_artifact_dir() -> Path:

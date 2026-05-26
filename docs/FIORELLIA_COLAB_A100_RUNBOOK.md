@@ -79,6 +79,13 @@ Before a full Colab rerun, use `Runtime -> Restart session and run all`. The fin
 
 ## Final Certification Flow
 
+In Colab, mount Drive from a notebook cell before launching the CLI runner:
+
+```python
+from google.colab import drive
+drive.mount("/content/drive", force_remount=True)
+```
+
 To move from `GO CON RISERVA` to a real final verdict, run the all-in-one A100 certification script from the Colab repo root:
 
 ```bash
