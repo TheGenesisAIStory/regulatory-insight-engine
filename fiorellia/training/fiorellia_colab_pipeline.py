@@ -211,8 +211,11 @@ def is_abstention(text: Any) -> bool:
     t = normalize_text(text).lower()
     patterns = [
         r"non (posso|sono in grado di) rispondere", r"non (dispongo|ho) (di )?(informazioni|fonti|contesto|evidenze)",
+        r"non posso fornire (informazioni|dati|consulenze)",
+        r"non posso fornire informazioni in tempo reale",
         r"fonti .* non (sono sufficienti|supportano)", r"non risulta supportat[oa] dalle fonti",
         r"non posso inferire", r"assenza di fonti", r"fuori ambito", r"non rientra nel perimetro",
+        r"assistente normativo basato su documentazione statica",
     ]
     return _regex_any(patterns, t)
 
@@ -230,7 +233,19 @@ def is_formal_style(text: Any) -> bool:
         return False
     if any(bad in t for bad in ["ciao", "certo!", "ok,", "sure", "hello"]):
         return False
-    return _regex_any([r"ai sensi", r"in base", r"secondo", r"la normativa", r"si evidenzia", r"non risulta"], t)
+    return _regex_any(
+        [
+            r"ai sensi",
+            r"in base",
+            r"secondo",
+            r"la normativa",
+            r"si evidenzia",
+            r"non risulta",
+            r"in qualit[aà] di assistente",
+            r"si prega di consultare",
+        ],
+        t,
+    )
 
 
 def has_source_reference(text: Any) -> bool:

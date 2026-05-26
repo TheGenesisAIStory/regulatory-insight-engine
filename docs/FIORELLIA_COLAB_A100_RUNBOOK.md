@@ -49,6 +49,29 @@ The v2 dataset contains 60 supervised records:
 - 18 out-of-scope refusal examples;
 - 12 narrow in-scope grounded examples with explicit retrieved context.
 
+## Final Perfection Recovery
+
+After a real `NO-GO`, use the failure-audit runner instead of reusing stale verdict files:
+
+```bash
+python final_perfection_run.py \
+  --install-deps \
+  --copy-verdict-to-repo
+```
+
+The runner:
+
+- reads the latest `adapter_eval_scored.jsonl` from `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest/` when present;
+- writes `failure_audit.json` and `failure_audit.md`;
+- removes training rows that fuzzy-match failed eval queries;
+- adds 20 extreme abstention examples for real-time market data, future political predictions and personal legal advice;
+- writes `supervised_v3_final_perfection_20260527.jsonl`;
+- trains `fiorellia_behavior_FINAL_PERFECTION_20260527` with LR `5e-5`, 5 epochs and `weight_decay: 0.05`;
+- evaluates with `system_prompt_strict.md`;
+- writes `metrics_summary.json`, `comparison.csv`, `adapter_eval_scored.jsonl`, `final_perfection_summary.json`, `final_verdict_master.md` and `app_unlock.json`.
+
+`GO DEFINITIVO` is allowed only from the current run metrics and app smoke tests; previous `NO-GO` RuntimeErrors are ignored, but failed current metrics still keep the app locked.
+
 ## Permanent Repo Fixes
 
 The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink workarounds are no longer needed:

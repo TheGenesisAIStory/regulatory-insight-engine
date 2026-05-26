@@ -61,7 +61,15 @@ fiorellia/prompts/system_prompt_strict.md
 fiorellia/eval/eval_set_behavior_hardening_v1.jsonl
 ```
 
-Il prossimo run Colab produce un adapter versionato `fiorellia_behavior_RC_HARDENED_20260526` senza sovrascrivere gli artefatti precedenti.
+Recovery finale per analisi fallimenti, pulizia dataset, 20 esempi di astensione estrema e retraining conservativo:
+
+```text
+final_perfection_run.py
+fiorellia/training/supervised_v3_final_perfection_20260527.jsonl
+fiorellia/training/configs/config_lora_behavior_20260527_final_perfection.yaml
+```
+
+Il prossimo run Colab produce un adapter versionato `fiorellia_behavior_FINAL_PERFECTION_20260527` senza sovrascrivere gli artefatti precedenti.
 
 ---
 

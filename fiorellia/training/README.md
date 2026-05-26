@@ -73,6 +73,24 @@ Dopo il verdict reale `NO-GO`, il candidato attivo e:
 Il dataset v2 contiene 60 esempi supervisionati: 50% unsupported abstention, 30% out-of-scope refusal e 20% in-scope grounded con contesto esplicito.
 - Per default questi artefatti non vanno committati su GitHub.
 
+## Final perfection recovery 2026-05-27
+
+Il runner operativo per il retraining dopo un `NO-GO` e:
+
+```bash
+python final_perfection_run.py --install-deps --copy-verdict-to-repo
+```
+
+Produce:
+
+- audit dei fallimenti da `adapter_eval_scored.jsonl`;
+- dataset `fiorellia/training/supervised_v3_final_perfection_20260527.jsonl`;
+- config `fiorellia/training/configs/config_lora_behavior_20260527_final_perfection.yaml`;
+- adapter `fiorellia_behavior_FINAL_PERFECTION_20260527`;
+- `final_verdict_master.md` e `app_unlock.json` nella delivery Drive.
+
+La config finale usa `learning_rate: 5e-5`, `num_train_epochs: 5`, `weight_decay: 0.05` e `system_prompt_strict.md` per training/eval.
+
 ## Dataset Categories
 
 Use these Fiorell.IA-specific categories alongside the shared supervised schema:

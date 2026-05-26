@@ -76,6 +76,7 @@ def _try_start_mlflow_run(
             "lora_alpha": int(config["lora_alpha"]),
             "lora_dropout": float(config["lora_dropout"]),
             "learning_rate": float(config["learning_rate"]),
+            "weight_decay": float(config.get("weight_decay", 0.0)),
             "num_train_epochs": float(config["num_train_epochs"]),
             "max_seq_length": int(config["max_seq_length"]),
         }
@@ -188,6 +189,7 @@ def train_cpu_loop(
     optimizer = torch.optim.AdamW(
         (parameter for parameter in model.parameters() if parameter.requires_grad),
         lr=float(config["learning_rate"]),
+        weight_decay=float(config.get("weight_decay", 0.0)),
     )
     grad_acc = max(1, int(config["gradient_accumulation_steps"]))
     epochs = int(float(config["num_train_epochs"]))
@@ -374,6 +376,7 @@ def main() -> int:
         "per_device_train_batch_size": int(config["per_device_train_batch_size"]),
         "gradient_accumulation_steps": int(config["gradient_accumulation_steps"]),
         "learning_rate": float(config["learning_rate"]),
+        "weight_decay": float(config.get("weight_decay", 0.0)),
         "warmup_ratio": float(config["warmup_ratio"]),
         "logging_steps": int(config["logging_steps"]),
         "save_steps": int(config["save_steps"]),

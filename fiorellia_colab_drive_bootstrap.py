@@ -99,6 +99,9 @@ if str(REPO_ROOT) not in sys.path:
 
 ensure_file("fiorellia_colab_cell04_hotfix.py", "Runner mount guard verified")
 ensure_file("fiorellia/training/final_colab_certification.py", "Drive already available, skipping mount.")
+ensure_file("final_perfection_run.py", "Fiorell.IA failure audit, final dataset recovery")
+ensure_file("fiorellia/training/train_lora_behavior_v1.py", "weight_decay")
+ensure_file("fiorellia/training/fiorellia_colab_pipeline.py", "assistente normativo basato su documentazione statica")
 ensure_file("fiorellia/training/build_behavior_hardening_v2.py", "supervised_v2_behavior_hardening_20260526")
 ensure_file("fiorellia/training/configs/config_lora_behavior_20260526_behavior_hardening.yaml", "fiorellia_behavior_hardening_20260526")
 ensure_file("fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl", "fio-v2-ua-001")
