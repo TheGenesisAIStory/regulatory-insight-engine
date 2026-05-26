@@ -87,7 +87,7 @@ def ensure_repo_root() -> None:
 def refresh_critical_files() -> None:
     critical_files = {
         "fiorellia_colab_drive_bootstrap.py": "drive_first_bootstrap",
-        "final_perfection_run.py": "gold-release",
+        "final_perfection_run.py": "balance_gold_boundaries",
         "fiorellia_gold_zero_touch.py": "GOLD_RELEASE",
         "fiorellia/training/train_lora_behavior_v1.py": "weight_decay",
         "fiorellia/training/fiorellia_colab_pipeline.py": "documentazione statica",
@@ -195,6 +195,11 @@ def run_gold_certification() -> dict[str, Any]:
         "4",
         "--weight-decay",
         "0.05",
+        "--balance-gold-boundaries",
+        "--min-grounded-count",
+        "72",
+        "--min-out-of-scope-count",
+        "40",
     ]
     completed = run(command, cwd=DRIVE_REPO_ROOT, check=False)
     summary_path = ARTIFACT_DIR / "final_perfection_summary.json"
@@ -282,4 +287,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    code = main()
+    if os.environ.get("FIORELLIA_NOTEBOOK_NO_EXIT") == "1":
+        print(f"Fiorell.IA Gold Release completed with code={code}")
+    else:
+        raise SystemExit(code)

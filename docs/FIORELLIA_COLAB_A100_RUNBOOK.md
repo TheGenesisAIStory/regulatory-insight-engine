@@ -89,11 +89,14 @@ Run it in Colab A100 with `Runtime -> Run all`. It executes `fiorellia_gold_zero
 - verifies `nvidia-smi`, `torch.cuda.is_available()` and A100;
 - runs `final_perfection_run.py --gold-release`;
 - triplicates unsupported-abstention training examples when the clean source set has fewer than 50;
+- balances the Gold training set after abstention triplication with at least 72 grounded examples and 40 out-of-scope examples, so the model does not collapse into always abstaining;
 - trains with `num_train_epochs=10`, `learning_rate=3e-5`, `gradient_accumulation_steps=4`;
 - retries once with a smaller memory profile if training fails;
 - writes `loss_report.md` and `loss_curve.csv`;
 - saves the adapter ZIP and release manifest in `/content/drive/MyDrive/regulatory-insight-engine/releases/gold_release_latest/`;
 - launches a public Gradio demo with preset buttons for Normativa, Fuori Ambito and Allucinazione only after a real `GO DEFINITIVO`.
+
+If a previous Gold attempt produced `unsupported_abstention=1.0` but `in_scope_grounded=0.0`, rerun the notebook after pulling commit `43872f7` or later plus the Gold balance hotfix. That failure mode means the dataset was too abstention-heavy, not that the training infrastructure failed.
 
 ## Permanent Repo Fixes
 

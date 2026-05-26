@@ -347,6 +347,16 @@ def is_unsupported_train_row(row: Mapping[str, Any]) -> bool:
     return "unsupported" in category or "abstention" in category or "no_context" in category
 
 
+def is_in_scope_train_row(row: Mapping[str, Any]) -> bool:
+    category = str(row.get("category") or "").lower().replace("-", "_")
+    return "in_scope" in category or "grounded" in category or "inscope" in category
+
+
+def is_out_of_scope_train_row(row: Mapping[str, Any]) -> bool:
+    category = str(row.get("category") or "").lower().replace("-", "_")
+    return "out_of_scope" in category or "outofscope" in category or "refusal" in category or "oos" in category
+
+
 def triplicate_low_abstention_rows(
     rows: list[dict[str, Any]],
     min_abstention_for_triplicate: int,
@@ -372,6 +382,32 @@ def triplicate_low_abstention_rows(
     return rows + duplicates, duplicates
 
 
+def duplicate_category_to_minimum(
+    rows: list[dict[str, Any]],
+    predicate: Any,
+    target_count: int,
+    suffix: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    source_rows = [row for row in rows if predicate(row)]
+    if not source_rows or len(source_rows) >= target_count:
+        return rows, []
+    existing_ids = {str(row.get("id")) for row in rows}
+    duplicates: list[dict[str, Any]] = []
+    needed = target_count - len(source_rows)
+    for index in range(needed):
+        duplicate = copy.deepcopy(source_rows[index % len(source_rows)])
+        base_id = str(duplicate.get("id") or f"{suffix}-{index + 1:03d}")
+        new_id = f"{base_id}-goldbalance-{suffix}-{index + 1:03d}"
+        serial = 1
+        while new_id in existing_ids:
+            serial += 1
+            new_id = f"{base_id}-goldbalance-{suffix}-{index + 1:03d}-{serial}"
+        duplicate["id"] = new_id
+        existing_ids.add(new_id)
+        duplicates.append(duplicate)
+    return rows + duplicates, duplicates
+
+
 def build_clean_augmented_dataset(
     source_dataset: Path,
     output_dataset: Path,
@@ -380,6 +416,9 @@ def build_clean_augmented_dataset(
     audit: Mapping[str, Any],
     triplicate_low_abstention: bool = False,
     min_abstention_for_triplicate: int = 50,
+    balance_gold_boundaries: bool = False,
+    min_grounded_count: int = 64,
+    min_out_of_scope_count: int = 36,
 ) -> dict[str, Any]:
     system_prompt = system_prompt_path.read_text(encoding="utf-8")
     rows = [replace_system_prompt(row, system_prompt) for row in read_jsonl(source_dataset)]
@@ -408,6 +447,21 @@ def build_clean_augmented_dataset(
             raise RuntimeError(f"Duplicate generated id: {row['id']}")
         additions.append(row)
     final_rows = kept_after_triplicate + additions
+    grounded_balance_rows: list[dict[str, Any]] = []
+    out_of_scope_balance_rows: list[dict[str, Any]] = []
+    if balance_gold_boundaries:
+        final_rows, grounded_balance_rows = duplicate_category_to_minimum(
+            final_rows,
+            is_in_scope_train_row,
+            target_count=min_grounded_count,
+            suffix="grounded",
+        )
+        final_rows, out_of_scope_balance_rows = duplicate_category_to_minimum(
+            final_rows,
+            is_out_of_scope_train_row,
+            target_count=min_out_of_scope_count,
+            suffix="oos",
+        )
     write_jsonl(final_rows, output_dataset)
     counts = Counter(str(row.get("category")) for row in final_rows)
     summary = {
@@ -417,11 +471,16 @@ def build_clean_augmented_dataset(
         "rows_removed_failure_matches": len(removed),
         "rows_triplicated_abstention_added": len(triplicated_rows),
         "rows_extreme_abstention_added": len(additions),
+        "rows_grounded_balance_added": len(grounded_balance_rows),
+        "rows_out_of_scope_balance_added": len(out_of_scope_balance_rows),
         "rows_final": len(final_rows),
         "category_counts": dict(counts),
         "removed_rows": removed,
         "triplicate_low_abstention": triplicate_low_abstention,
         "min_abstention_for_triplicate": min_abstention_for_triplicate,
+        "balance_gold_boundaries": balance_gold_boundaries,
+        "min_grounded_count": min_grounded_count,
+        "min_out_of_scope_count": min_out_of_scope_count,
         "extreme_abstention_answer": EXTREME_ABSTENTION_ANSWER,
     }
     write_dataset_card(output_card, summary)
@@ -436,6 +495,8 @@ def write_dataset_card(path: Path, summary: Mapping[str, Any]) -> None:
         f"- Removed failure-matched rows: `{summary['rows_removed_failure_matches']}`",
         f"- Added triplicated abstention rows: `{summary.get('rows_triplicated_abstention_added', 0)}`",
         f"- Added extreme abstention rows: `{summary['rows_extreme_abstention_added']}`",
+        f"- Added grounded balance rows: `{summary.get('rows_grounded_balance_added', 0)}`",
+        f"- Added out-of-scope balance rows: `{summary.get('rows_out_of_scope_balance_added', 0)}`",
         f"- Final rows: `{summary['rows_final']}`",
         "",
         "## Category Counts",
@@ -823,6 +884,9 @@ def main() -> int:
     parser.add_argument("--gold-release", action="store_true")
     parser.add_argument("--triplicate-low-abstention", action="store_true")
     parser.add_argument("--min-abstention-for-triplicate", type=int, default=50)
+    parser.add_argument("--balance-gold-boundaries", action="store_true")
+    parser.add_argument("--min-grounded-count", type=int, default=64)
+    parser.add_argument("--min-out-of-scope-count", type=int, default=36)
     parser.add_argument("--learning-rate", type=float, default=None)
     parser.add_argument("--num-train-epochs", type=float, default=None)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=None)
@@ -848,6 +912,7 @@ def main() -> int:
     gradient_accumulation_steps = args.gradient_accumulation_steps if args.gradient_accumulation_steps is not None else (4 if args.gold_release else 8)
     weight_decay = args.weight_decay if args.weight_decay is not None else 0.05
     triplicate_low_abstention = args.triplicate_low_abstention or args.gold_release
+    balance_gold_boundaries = args.balance_gold_boundaries or args.gold_release
 
     scored_path = find_scored_jsonl(artifact_dir, args.scored_jsonl)
     scored_rows, previous_metrics, scored_status = load_or_score_eval(scored_path)
@@ -869,6 +934,9 @@ def main() -> int:
         audit=audit,
         triplicate_low_abstention=triplicate_low_abstention,
         min_abstention_for_triplicate=args.min_abstention_for_triplicate,
+        balance_gold_boundaries=balance_gold_boundaries,
+        min_grounded_count=args.min_grounded_count,
+        min_out_of_scope_count=args.min_out_of_scope_count,
     )
     config = write_final_config(
         args.base_config,
