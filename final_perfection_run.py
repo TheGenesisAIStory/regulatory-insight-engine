@@ -978,6 +978,9 @@ def main() -> int:
         optional_install_deps()
     runtime = require_a100_runtime(require_a100=not args.no_require_a100)
     write_json(runtime, artifact_dir / "runtime_gpu.json")
+    if local_adapter_dir.exists():
+        print(f"Removing stale local adapter directory before training: {local_adapter_dir}")
+        shutil.rmtree(local_adapter_dir)
 
     training_attempts = run_training_with_auto_heal(
         config_path=args.output_config,
