@@ -68,11 +68,22 @@ def drive_repo_root() -> Path | None:
 
 
 def mount_drive_if_colab() -> None:
+    if drive_root() is not None:
+        return
+    if os.getenv("FIORELLIA_SKIP_DRIVE_MOUNT") == "1":
+        return
+    try:
+        from IPython import get_ipython  # type: ignore
+    except Exception:
+        get_ipython = None  # type: ignore[assignment]
+    ipython = get_ipython() if get_ipython is not None else None  # type: ignore[operator]
+    if ipython is None or getattr(ipython, "kernel", None) is None:
+        return
     try:
         from google.colab import drive  # type: ignore
     except Exception:
         return
-    drive.mount("/content/drive")
+    drive.mount("/content/drive", force_remount=False)
 
 
 def default_artifact_dir() -> Path:
