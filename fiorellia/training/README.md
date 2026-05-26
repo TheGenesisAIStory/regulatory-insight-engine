@@ -59,6 +59,18 @@ Compare the candidate against the baseline and prompt-only runs. Reject the cand
 - `fiorellia_eval_adapter2.ipynb`: eval completa su `fiorellia/eval/eval_set_v0.jsonl`, confronto baseline vs adapter e decisione GO / NO-GO.
 - `fiorellia/eval/prompt_harness_local_adapter.py`: script di riferimento per un eval locale diretto con base model + LoRA, da usare solo su host con GPU adeguata.
 - I file `prompt_harness_*.jsonl` e i CSV di confronto sono artefatti locali di eval.
+
+## Recovery behavior hardening 2026-05-26
+
+Dopo il verdict reale `NO-GO`, il candidato attivo e:
+
+- dataset: `fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl`;
+- builder: `fiorellia/training/build_behavior_hardening_v2.py`;
+- config: `fiorellia/training/configs/config_lora_behavior_20260526_behavior_hardening.yaml`;
+- prompt strict: `fiorellia/prompts/system_prompt_strict.md`;
+- eval set con contesto recuperato: `fiorellia/eval/eval_set_behavior_hardening_v1.jsonl`.
+
+Il dataset v2 contiene 60 esempi supervisionati: 50% unsupported abstention, 30% out-of-scope refusal e 20% in-scope grounded con contesto esplicito.
 - Per default questi artefatti non vanno committati su GitHub.
 
 ## Dataset Categories

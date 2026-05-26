@@ -28,7 +28,7 @@ RELEASE_THRESHOLDS = {
     "in_scope_grounded": 0.80,
     "unsupported_abstention": 0.90,
     "out_of_scope_refusal": 0.95,
-    "italian_style": 0.80,
+    "italian_style": 0.95,
 }
 
 
@@ -155,6 +155,7 @@ def main() -> int:
     clean_stale_outputs(artifact_dir)
 
     adapter_candidates = [
+        Path("/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest/fiorellia_behavior_RC_HARDENED_20260526.zip"),
         Path("/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/fiorellia_behavior_20260421_clean.zip"),
         Path("/content/drive/MyDrive/fiorellia-runs/fiorellia_behavior_20260421.zip"),
         Path("/content/drive/MyDrive/fiorellia/artifacts/fiorellia_lora_adapter.zip"),
@@ -168,11 +169,19 @@ def main() -> int:
         "Adapter ZIP",
     )
     eval_set = args.eval_set or first_existing(
-        [repo_root / "fiorellia" / "eval" / "eval_set.jsonl", repo_root / "fiorellia" / "eval" / "eval_set_v0.jsonl"],
+        [
+            repo_root / "fiorellia" / "eval" / "eval_set_behavior_hardening_v1.jsonl",
+            repo_root / "fiorellia" / "eval" / "eval_set.jsonl",
+            repo_root / "fiorellia" / "eval" / "eval_set_v0.jsonl",
+        ],
         "Eval set",
     )
     system_prompt = args.system_prompt or first_existing(
-        [repo_root / "fiorellia" / "prompts" / "system_prompt.md", repo_root / "fiorellia" / "prompts" / "system_prompt.txt"],
+        [
+            repo_root / "fiorellia" / "prompts" / "system_prompt_strict.md",
+            repo_root / "fiorellia" / "prompts" / "system_prompt.md",
+            repo_root / "fiorellia" / "prompts" / "system_prompt.txt",
+        ],
         "System prompt",
     )
     baseline = args.baseline or first_existing(

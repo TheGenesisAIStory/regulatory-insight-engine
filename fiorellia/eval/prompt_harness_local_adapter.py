@@ -13,8 +13,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DATASET = ROOT / "fiorellia" / "eval" / "eval_set_v0.jsonl"
-DEFAULT_SYSTEM_PROMPT = ROOT / "fiorellia" / "prompts" / "system_prompt.txt"
+DEFAULT_DATASET = ROOT / "fiorellia" / "eval" / "eval_set_behavior_hardening_v1.jsonl"
+DEFAULT_SYSTEM_PROMPT = ROOT / "fiorellia" / "prompts" / "system_prompt_strict.md"
 DEFAULT_OUTPUT = ROOT / "fiorellia" / "eval" / "prompt_harness_behavior_lora_20260421.jsonl"
 DEFAULT_ADAPTER = ROOT / "fiorellia" / "training" / "lora" / "fiorellia_behavior_20260421"
 
@@ -45,19 +45,30 @@ def is_mps_oom(exc: Exception) -> bool:
     return "mps" in message and "out of memory" in message
 
 
-def build_messages(system_prompt: str, user_query: str) -> list[dict[str, str]]:
+def retrieved_context(record: dict[str, Any]) -> str:
+    for key in ["retrieved_context", "context", "local_context", "sources"]:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def build_messages(system_prompt: str, user_query: str, context: str = "") -> list[dict[str, str]]:
+    user_parts = []
+    if context.strip():
+        user_parts.extend(["Contesto locale recuperato:", context.strip()])
+    else:
+        user_parts.extend(["Contesto locale recuperato:", "[nessun contesto recuperato]"])
+    user_parts.extend(
+        [
+            "Domanda utente:",
+            user_query.strip(),
+            "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti.",
+        ]
+    )
     return [
         {"role": "system", "content": system_prompt.strip()},
-        {
-            "role": "user",
-            "content": "\n\n".join(
-                [
-                    "Domanda utente:",
-                    user_query.strip(),
-                    "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti.",
-                ]
-            ),
-        },
+        {"role": "user", "content": "\n\n".join(user_parts)},
     ]
 
 
@@ -65,9 +76,10 @@ def build_inputs(
     tokenizer: AutoTokenizer,
     system_prompt: str,
     user_query: str,
+    context: str,
     device: str,
 ) -> dict[str, torch.Tensor]:
-    messages = build_messages(system_prompt, user_query)
+    messages = build_messages(system_prompt, user_query, context)
     if hasattr(tokenizer, "apply_chat_template"):
         prompt_text = tokenizer.apply_chat_template(
             messages,
@@ -106,10 +118,11 @@ def generate_answer(
     tokenizer: AutoTokenizer,
     system_prompt: str,
     user_query: str,
+    context: str,
     device: str,
     max_new_tokens: int,
 ) -> str:
-    inputs = build_inputs(tokenizer, system_prompt, user_query, device)
+    inputs = build_inputs(tokenizer, system_prompt, user_query, context, device)
     prompt_length = inputs["input_ids"].shape[-1]
     with torch.no_grad():
         output = model.generate(
@@ -177,6 +190,7 @@ def main() -> int:
                 tokenizer=tokenizer,
                 system_prompt=system_prompt,
                 user_query=record["user_query"],
+                context=retrieved_context(record),
                 device=device,
                 max_new_tokens=args.max_new_tokens,
             )
@@ -191,6 +205,7 @@ def main() -> int:
             "id": record["id"],
             "category": record["category"],
             "user_query": record["user_query"],
+            "retrieved_context": retrieved_context(record),
             "model": f"{base_model}+{args.adapter_path.name}",
             "mode": "local_adapter",
             "model_answer": model_answer,

@@ -12,16 +12,24 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_ADAPTER = ROOT / "fiorellia" / "training" / "lora" / "fiorellia_behavior_20260421"
+DEFAULT_ADAPTER = ROOT / "fiorellia" / "training" / "lora" / "fiorellia_behavior_RC_HARDENED_20260526"
 DEFAULT_HISTORY = ROOT / "fiorellia_app_history.jsonl"
 
-SYSTEM_PROMPT = (ROOT / "fiorellia" / "prompts" / "system_prompt.txt").read_text(encoding="utf-8")
+SYSTEM_PROMPT = next(
+    path
+    for path in [
+        ROOT / "fiorellia" / "prompts" / "system_prompt_strict.md",
+        ROOT / "fiorellia" / "prompts" / "system_prompt.md",
+        ROOT / "fiorellia" / "prompts" / "system_prompt.txt",
+    ]
+    if path.exists()
+).read_text(encoding="utf-8")
 ABSTENTION_TEXT = (
     "Non ho trovato fonti locali sufficienti per rispondere in modo affidabile. "
     "Posso rispondere solo su contenuti regolamentari bancari supportati dai documenti indicizzati."
 )
 ABSTENTION_RE = re.compile(
-    r"\b(non posso|non ho trovato|fonti insufficienti|senza fonti|mi astengo|fuori dal perimetro)\b",
+    r"\b(non posso|non ho trovato|non ci sono fonti|fonti insufficienti|senza fonti|mi astengo|fuori (dal )?perimetro|non rientra|non fornisce)\b",
     re.IGNORECASE,
 )
 
@@ -104,12 +112,15 @@ class LocalLoraClient:
         self.model.to(self.device)
         self.model.eval()
 
-    def _prompt(self, query: str) -> str:
+    def _prompt(self, query: str, retrieved_context: str = "") -> str:
+        context = retrieved_context.strip() or "[nessun contesto recuperato]"
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": (
+                    "Contesto locale recuperato:\n"
+                    f"{context}\n\n"
                     "Domanda utente:\n"
                     f"{query.strip()}\n\n"
                     "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti."
@@ -120,11 +131,11 @@ class LocalLoraClient:
             return self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         return "\n\n".join(message["content"] for message in messages)
 
-    def ask(self, query: str) -> dict[str, Any]:
+    def ask(self, query: str, retrieved_context: str = "") -> dict[str, Any]:
         self._load()
         import torch
 
-        prompt = self._prompt(query)
+        prompt = self._prompt(query, retrieved_context)
         inputs = self.tokenizer(prompt, return_tensors="pt")
         inputs = {key: value.to(self.device) for key, value in inputs.items()}
         prompt_len = inputs["input_ids"].shape[-1]
@@ -151,7 +162,7 @@ class LocalLoraClient:
 class SafeFallbackClient:
     available = True
 
-    def ask(self, query: str) -> dict[str, Any]:
+    def ask(self, query: str, retrieved_context: str = "") -> dict[str, Any]:
         return {
             "answer": (
                 "Risposta:\n"
@@ -178,10 +189,10 @@ def choose_client(adapter_path: Path) -> Any:
     return SafeFallbackClient()
 
 
-def answer_query(query: str, client: Any, history_path: Path) -> tuple[str, float, bool, dict[str, Any]]:
+def answer_query(query: str, client: Any, history_path: Path, retrieved_context: str = "") -> tuple[str, float, bool, dict[str, Any]]:
     started = time.time()
     try:
-        result = client.ask(query)
+        result = client.ask(query, retrieved_context=retrieved_context)
     except Exception as exc:
         result = SafeFallbackClient().ask(query)
         result["reason"] = f"runtime_error: {exc}"
@@ -207,6 +218,7 @@ SMOKE_CASES = [
     {
         "id": "grounded_in_scope",
         "query": "Quali sono i principali requisiti sui fondi propri nel CRR?",
+        "retrieved_context": "[CRR, art. 92] Le istituzioni rispettano requisiti di fondi propri espressi come coefficienti di capitale rispetto all'esposizione complessiva al rischio.",
         "expected_no_answer": False,
     },
     {
@@ -238,7 +250,7 @@ def run_smoke_test(adapter_path: Path, history_path: Path) -> int:
     client = choose_client(adapter_path) if load_model else SafeFallbackClient()
     results = []
     for case in SMOKE_CASES:
-        answer, score, no_answer, meta = answer_query(case["query"], client, history_path)
+        answer, score, no_answer, meta = answer_query(case["query"], client, history_path, case.get("retrieved_context", ""))
         expected = bool(case["expected_no_answer"])
         ok = no_answer == expected
         if not load_model and case["id"] == "grounded_in_scope":

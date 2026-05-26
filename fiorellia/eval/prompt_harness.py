@@ -14,8 +14,8 @@ from urllib.error import URLError
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DATASET = ROOT / "fiorellia" / "eval" / "eval_set.jsonl"
-DEFAULT_SYSTEM_PROMPT = ROOT / "fiorellia" / "prompts" / "system_prompt.md"
+DEFAULT_DATASET = ROOT / "fiorellia" / "eval" / "eval_set_behavior_hardening_v1.jsonl"
+DEFAULT_SYSTEM_PROMPT = ROOT / "fiorellia" / "prompts" / "system_prompt_strict.md"
 DEFAULT_LOG = ROOT / "fiorellia" / "eval" / "prompt_harness_logs.jsonl"
 DEFAULT_MODEL = "qwen2.5:3b"
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
@@ -34,15 +34,28 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def build_prompt(system_prompt: str, user_query: str) -> str:
-    return "\n\n".join(
+def retrieved_context(record: dict[str, Any]) -> str:
+    for key in ["retrieved_context", "context", "local_context", "sources"]:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def build_prompt(system_prompt: str, user_query: str, context: str = "") -> str:
+    parts = [system_prompt.strip()]
+    if context.strip():
+        parts.extend(["Contesto locale recuperato:", context.strip()])
+    else:
+        parts.extend(["Contesto locale recuperato:", "[nessun contesto recuperato]"])
+    parts.extend(
         [
-            system_prompt.strip(),
             "Domanda utente:",
             user_query.strip(),
             "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti.",
         ]
     )
+    return "\n\n".join(parts)
 
 
 def call_ollama_api(prompt: str, model: str, host: str, timeout: int) -> str:
@@ -123,24 +136,27 @@ def detect_device(force_cpu: bool) -> tuple[str, Any]:
     return "cpu", torch.float32
 
 
-def build_messages(system_prompt: str, user_query: str) -> list[dict[str, str]]:
+def build_messages(system_prompt: str, user_query: str, context: str = "") -> list[dict[str, str]]:
+    user_parts = []
+    if context.strip():
+        user_parts.extend(["Contesto locale recuperato:", context.strip()])
+    else:
+        user_parts.extend(["Contesto locale recuperato:", "[nessun contesto recuperato]"])
+    user_parts.extend(
+        [
+            "Domanda utente:",
+            user_query.strip(),
+            "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti.",
+        ]
+    )
     return [
         {"role": "system", "content": system_prompt.strip()},
-        {
-            "role": "user",
-            "content": "\n\n".join(
-                [
-                    "Domanda utente:",
-                    user_query.strip(),
-                    "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti.",
-                ]
-            ),
-        },
+        {"role": "user", "content": "\n\n".join(user_parts)},
     ]
 
 
-def build_adapter_inputs(tokenizer: Any, system_prompt: str, user_query: str, device: str) -> dict[str, Any]:
-    messages = build_messages(system_prompt, user_query)
+def build_adapter_inputs(tokenizer: Any, system_prompt: str, user_query: str, context: str, device: str) -> dict[str, Any]:
+    messages = build_messages(system_prompt, user_query, context)
     if hasattr(tokenizer, "apply_chat_template"):
         prompt_text = tokenizer.apply_chat_template(
             messages,
@@ -148,7 +164,7 @@ def build_adapter_inputs(tokenizer: Any, system_prompt: str, user_query: str, de
             add_generation_prompt=True,
         )
     else:
-        prompt_text = build_prompt(system_prompt, user_query)
+        prompt_text = build_prompt(system_prompt, user_query, context)
     encoded = tokenizer(prompt_text, return_tensors="pt")
     return {key: value.to(device) for key, value in encoded.items()}
 
@@ -182,12 +198,13 @@ def generate_adapter_answer(
     tokenizer: Any,
     system_prompt: str,
     user_query: str,
+    context: str,
     device: str,
     max_new_tokens: int,
 ) -> str:
     import torch
 
-    inputs = build_adapter_inputs(tokenizer, system_prompt, user_query, device)
+    inputs = build_adapter_inputs(tokenizer, system_prompt, user_query, context, device)
     prompt_length = inputs["input_ids"].shape[-1]
     with torch.no_grad():
         output = model.generate(
@@ -233,6 +250,7 @@ def run_adapter_harness(
                     tokenizer=tokenizer,
                     system_prompt=system_prompt,
                     user_query=record["user_query"],
+                    context=retrieved_context(record),
                     device=device,
                     max_new_tokens=max_new_tokens,
                 )
@@ -247,6 +265,7 @@ def run_adapter_harness(
                 "id": record["id"],
                 "category": record["category"],
                 "user_query": record["user_query"],
+                "retrieved_context": retrieved_context(record),
                 "model": f"{base_model}+LoRA",
                 "mode": "adapter_zip",
                 "adapter_zip": str(adapter_zip),
@@ -302,7 +321,7 @@ def main() -> int:
     print(f"log={out_path}")
 
     for index, record in enumerate(records, start=1):
-        prompt = build_prompt(system_prompt, record["user_query"])
+        prompt = build_prompt(system_prompt, record["user_query"], retrieved_context(record))
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
             model_answer = answer(prompt, args.model, args.mode, args.ollama_host, args.timeout)
@@ -317,6 +336,7 @@ def main() -> int:
             "id": record["id"],
             "category": record["category"],
             "user_query": record["user_query"],
+            "retrieved_context": retrieved_context(record),
             "model": args.model,
             "mode": args.mode,
             "model_answer": model_answer,

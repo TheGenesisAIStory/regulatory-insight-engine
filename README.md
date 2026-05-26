@@ -52,6 +52,17 @@ Il flusso operativo Fiorell.IA attivo è solo Colab/Drive-first. Eventuali file 
 
 Il notebook finale salva sempre gli esiti reali su Drive. Se Colab non può autenticarsi su GitHub, scrive `github_publish_status.json` e lascia la pubblicazione al checkout locale autenticato. Se il verdict non è `GO DEFINITIVO`, scrive `app_launch_status.json` e non apre la UI pubblica Gradio.
 
+Recovery behavior-hardening attivo dopo il `NO-GO` reale:
+
+```text
+fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl
+fiorellia/training/configs/config_lora_behavior_20260526_behavior_hardening.yaml
+fiorellia/prompts/system_prompt_strict.md
+fiorellia/eval/eval_set_behavior_hardening_v1.jsonl
+```
+
+Il prossimo run Colab produce un adapter versionato `fiorellia_behavior_RC_HARDENED_20260526` senza sovrascrivere gli artefatti precedenti.
+
 ---
 
 ## Percorso consigliato per utenti non tecnici

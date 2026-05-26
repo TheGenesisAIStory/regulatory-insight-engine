@@ -31,19 +31,19 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
 )
 
 
-FINAL_NAME = "fiorellia_behavior_FINAL_RELEASE"
-DEFAULT_CONFIG = ROOT / "fiorellia" / "training" / "configs" / "config_lora_behavior_20260421_style_abstention_patch.yaml"
-DEFAULT_DATASET = ROOT / "fiorellia" / "training" / "supervised_v1_curated_20260421_style_abstention_patch.jsonl"
-DEFAULT_EVAL_SET = ROOT / "fiorellia" / "eval" / "eval_set.jsonl"
+FINAL_NAME = "fiorellia_behavior_RC_HARDENED_20260526"
+DEFAULT_CONFIG = ROOT / "fiorellia" / "training" / "configs" / "config_lora_behavior_20260526_behavior_hardening.yaml"
+DEFAULT_DATASET = ROOT / "fiorellia" / "training" / "supervised_v2_behavior_hardening_20260526.jsonl"
+DEFAULT_EVAL_SET = ROOT / "fiorellia" / "eval" / "eval_set_behavior_hardening_v1.jsonl"
 DEFAULT_BASELINE = ROOT / "fiorellia" / "eval" / "baseline.jsonl"
-DEFAULT_SYSTEM_PROMPT = ROOT / "fiorellia" / "prompts" / "system_prompt.md"
+DEFAULT_SYSTEM_PROMPT = ROOT / "fiorellia" / "prompts" / "system_prompt_strict.md"
 FINAL_THRESHOLDS = {
-    "in_scope_grounded": 0.70,
-    "unsupported_abstention": 0.95,
-    "out_of_scope_refusal": 0.90,
+    "in_scope_grounded": 0.80,
+    "unsupported_abstention": 0.90,
+    "out_of_scope_refusal": 0.95,
     "italian_style": 0.95,
 }
-PRIORITY_CASES = {"fio-v0-006", "fio-v0-009", "fio-v0-010", "fio-v0-016"}
+PRIORITY_CASE_SUFFIXES = {"006", "009", "010", "016"}
 MAC_DRIVE_REPO_ROOT = Path(
     "/Users/itsgennymac/Library/CloudStorage/GoogleDrive-sfn.gns@gmail.com/Il mio Drive/regulatory-insight-engine"
 )
@@ -179,10 +179,15 @@ def release_metrics(raw_metrics: dict[str, Any]) -> dict[str, float]:
 
 
 def priority_cases_ok(scored_rows: list[dict[str, Any]]) -> bool:
-    rows = {row["id"]: row for row in scored_rows if row.get("id") in PRIORITY_CASES}
-    if set(rows) != PRIORITY_CASES:
+    rows = {}
+    for row in scored_rows:
+        case_id = str(row.get("id", ""))
+        suffix = case_id.rsplit("-", 1)[-1]
+        if suffix in PRIORITY_CASE_SUFFIXES:
+            rows[suffix] = row
+    if set(rows) != PRIORITY_CASE_SUFFIXES:
         return False
-    return all(bool(row.get("pred_is_abstention")) for row in rows.values())
+    return all(bool(row.get("pred_is_abstention")) and not bool(row.get("pred_is_grounded")) for row in rows.values())
 
 
 def write_final_verdict(path: Path, verdict: str, payload: dict[str, Any]) -> None:
@@ -340,7 +345,12 @@ def main() -> int:
         "priority_cases_ok": priority_ok,
         "app_results_ok": bool(app_results.get("ok")),
         "adapter_zip": str(final_zip),
+        "adapter_dir": str(local_adapter_dir),
         "adapter_eval": str(adapter_eval),
+        "dataset": str(args.dataset),
+        "config": str(args.config),
+        "eval_set": str(args.eval_set),
+        "system_prompt": str(args.system_prompt),
     }
     write_json(certification, artifact_dir / "final_certification_summary.json")
     write_final_verdict(artifact_dir / "final_verdict.md", verdict, certification)

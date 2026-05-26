@@ -26,6 +26,29 @@ The bootstrap:
 - refreshes stale critical scripts from GitHub, including `final_colab_certification.py` and `fiorellia_colab_cell04_hotfix.py`;
 - creates stable aliases and `__init__.py` files required by Colab imports.
 
+## Current Behavior Hardening Candidate
+
+The active recovery candidate after the real `NO-GO` certification is:
+
+```text
+fiorellia_behavior_RC_HARDENED_20260526
+```
+
+It uses:
+
+```text
+fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl
+fiorellia/training/configs/config_lora_behavior_20260526_behavior_hardening.yaml
+fiorellia/prompts/system_prompt_strict.md
+fiorellia/eval/eval_set_behavior_hardening_v1.jsonl
+```
+
+The v2 dataset contains 60 supervised records:
+
+- 30 unsupported abstention examples;
+- 18 out-of-scope refusal examples;
+- 12 narrow in-scope grounded examples with explicit retrieved context.
+
 ## Permanent Repo Fixes
 
 The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink workarounds are no longer needed:
@@ -116,8 +139,8 @@ The notebook wraps the same release script and also handles Drive mount, CUDA/A1
 
 The script fails fast unless CUDA is visible and the GPU is an A100. It then:
 
-- trains `fiorellia_behavior_FINAL_RELEASE` on the patched style/abstention dataset;
-- saves `fiorellia_behavior_FINAL_RELEASE.zip` to `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest/`;
+- trains `fiorellia_behavior_RC_HARDENED_20260526` on the behavior-hardening dataset;
+- saves `fiorellia_behavior_RC_HARDENED_20260526.zip` to `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest/`;
 - runs adapter eval with `prompt_harness_local_adapter.py`;
 - writes `metrics_summary.json`, `comparison.csv`, `adapter_eval_scored.jsonl`, `eval_diagnostics.json`, and `final_verdict.md`;
 - runs the required app smoke tests and writes `app_final_test_results.json`.
@@ -130,6 +153,6 @@ If the final verdict is `GO DEFINITIVO`, run the Colab app:
 
 ```bash
 python fiorellia_app_colab.py \
-  --adapter-path /content/fiorellia_behavior_FINAL_RELEASE \
+  --adapter-path /content/fiorellia_behavior_RC_HARDENED_20260526 \
   --share
 ```

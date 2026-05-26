@@ -3,8 +3,9 @@
 ## Model
 
 - Base model: `Qwen/Qwen2.5-3B-Instruct`
-- Adapter candidate: `fiorellia_behavior_20260421`
-- Active artifact ZIP: `fiorellia_behavior_20260421_clean.zip`
+- Previous adapter candidate: `fiorellia_behavior_20260421`
+- Recovery candidate to train: `fiorellia_behavior_RC_HARDENED_20260526`
+- Active recovery dataset: `fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl`
 - Artifact store: Google Drive, `fiorellia-runs/final_delivery_latest/`
 
 ## Intended Use
@@ -13,12 +14,11 @@ Fiorell.IA is a narrow experimental assistant for Italian banking-regulatory que
 
 ## Verified Status
 
-- OK: adapter directory validates locally with `adapter_config.json` and `adapter_model.safetensors`.
-- OK: clean adapter ZIP validates and excludes checkpoints, `.bin` files, and local metadata.
+- OK: previous final Colab run produced real artifacts and a real `NO-GO` verdict.
+- OK: behavior-hardening dataset, strict prompt and hardened eval set are versioned.
 - OK: app safe-fallback path is tested on the required abstention/refusal cases.
-- OK: Gradio UI loads locally in safe-fallback mode.
-- DA VERIFICARE: full baseline-vs-adapter generation must run on Colab A100.
-- DA VERIFICARE: final `metrics_summary.json` and `final_verdict.md` must come from real adapter outputs.
+- DA VERIFICARE: recovery adapter `fiorellia_behavior_RC_HARDENED_20260526` must be trained on Colab A100.
+- DA VERIFICARE: recovery baseline-vs-adapter evaluation must be rerun with real adapter outputs.
 
 ## Evaluation Requirements
 
@@ -33,7 +33,7 @@ Required metrics:
 - `in_scope_grounded >= 0.80`
 - `unsupported_abstention >= 0.90`
 - `out_of_scope_refusal >= 0.95`
-- `italian_style >= 0.80`
+- `italian_style >= 0.95`
 
 Priority unsupported cases must not produce severe false answers.
 
@@ -46,6 +46,6 @@ Priority unsupported cases must not produce severe false answers.
 
 ## Current Operational Verdict
 
-**GO CON RISERVA**
+**NO-GO**
 
-Reason: adapter and app packaging are verified locally and saved on Drive, but full adapter evaluation metrics still require Colab A100 execution.
+Reason: the last real Colab certification produced metrics below release thresholds. The recovery candidate is prepared but not yet trained/evaluated.

@@ -238,6 +238,73 @@ def has_source_reference(text: Any) -> bool:
     return _regex_any([r"\[.*?p\.\s*\d+.*?\]", r"pag(ina)?\.?\s*\d+", r"fonte", r"circ\.?\s*285", r"\bcrr\b", r"ifrs\s*9"], t)
 
 
+def has_invalid_source_reference(text: Any) -> bool:
+    t = normalize_text(text).lower()
+    patterns = [
+        r"pagina non specificata",
+        r"documento locale",
+        r"pagina/sezione",
+        r"fonte non disponibile",
+        r"fonti:\s*-\s*(?:nota|nessuna)\b",
+        r"fonti:\s*$",
+        r"fonti:\s*-\s*$",
+        r"\[pagina",
+        r"\[documento",
+        r"nessun documento locale",
+    ]
+    return _regex_any(patterns, t)
+
+
+def has_valid_source_reference(text: Any) -> bool:
+    if has_invalid_source_reference(text):
+        return False
+    t = normalize_text(text).lower()
+    patterns = [
+        r"fonti:\s*-\s*(crr|circ\.?\s*285|circolare\s*285|ifrs\s*9|basel|banca d'italia).{0,100}\b(art|par|parte|titolo|capitolo|sezione|aggiornamento|\d)",
+        r"\bcrr\s*-\s*art\.?\s*\d+",
+        r"\bifrs\s*9\s*-\s*par\.?\s*[\d.]+",
+        r"\bcircolare\s*285\s*-",
+        r"\bcirc\.?\s*285\s*-",
+        r"\bbasel\s*iii\s*-",
+        r"\[.*?p\.\s*\d+.*?\]",
+    ]
+    return _regex_any(patterns, t)
+
+
+def is_too_generic_grounded_answer(text: Any) -> bool:
+    t = normalize_text(text).lower()
+    if not t:
+        return True
+    generic_patterns = [
+        r"non sono state trovate .* specifiche",
+        r"il contesto recuperato non include",
+        r"risposta limitata ai documenti indicizzati",
+        r"documenti locali disponibili",
+    ]
+    return _regex_any(generic_patterns, t) and not has_valid_source_reference(t)
+
+
+def is_out_of_scope_refusal(text: Any) -> bool:
+    t = normalize_text(text).lower()
+    refusal = is_abstention(t) or _regex_any([r"fuori (dal )?perimetro", r"non rientra", r"non posso trattare"], t)
+    scope_markers = _regex_any(
+        [
+            r"investimento",
+            r"trading",
+            r"fiscal",
+            r"hr",
+            r"smart working",
+            r"mercato",
+            r"consulenza",
+            r"etf",
+            r"azioni",
+            r"covered call",
+        ],
+        t,
+    )
+    return refusal and scope_markers
+
+
 def infer_output_text(row: Mapping[str, Any]) -> str:
     for col in ["adapter_output", "model_answer", "model_output", "prediction", "response", "generated_text", "answer", "output"]:
         if col in row and row[col] is not None:
@@ -261,19 +328,41 @@ def score_eval_rows(rows: list[Mapping[str, Any]]) -> tuple[list[dict[str, Any]]
         output = infer_output_text(row)
         case = infer_case_type(row)
         pred_abstain = is_abstention(output)
-        pred_grounded = bool(output) and not pred_abstain and has_source_reference(output)
-        pred_style = is_mostly_italian(output) and is_formal_style(output)
+        pred_has_source = has_source_reference(output)
+        pred_invalid_source = has_invalid_source_reference(output)
+        pred_valid_source = has_valid_source_reference(output)
+        pred_out_refusal = is_out_of_scope_refusal(output)
+        pred_generic = is_too_generic_grounded_answer(output)
+        pred_grounded = bool(output) and not pred_abstain and pred_valid_source and not pred_generic
+        pred_style = is_mostly_italian(output) and (is_formal_style(output) or pred_abstain or pred_out_refusal)
         in_scope = any(x in case for x in ["in_scope", "inscope", "grounded"])
         unsupported = any(x in case for x in ["unsupported", "abstention", "no_source", "no_context"])
         out_scope = any(x in case for x in ["out_of_scope", "outofscope", "oos", "refusal"])
         if in_scope:
-            counts["in_scope"] += 1; sums["in_scope_grounded"].append(pred_grounded)
+            counts["in_scope"] += 1
+            sums["in_scope_grounded"].append(pred_grounded)
         if unsupported:
-            counts["unsupported"] += 1; sums["unsupported_abstention"].append(pred_abstain)
+            counts["unsupported"] += 1
+            sums["unsupported_abstention"].append(pred_abstain and not pred_grounded)
         if out_scope:
-            counts["out_of_scope"] += 1; sums["out_of_scope_refusal"].append(pred_abstain)
+            counts["out_of_scope"] += 1
+            sums["out_of_scope_refusal"].append(pred_out_refusal)
         sums["italian_style"].append(pred_style)
-        scored.append({**dict(row), "_case_norm": case, "_output_norm": output, "pred_is_abstention": pred_abstain, "pred_is_grounded": pred_grounded, "pred_italian_style": pred_style})
+        scored.append(
+            {
+                **dict(row),
+                "_case_norm": case,
+                "_output_norm": output,
+                "pred_is_abstention": pred_abstain,
+                "pred_is_grounded": pred_grounded,
+                "pred_is_out_of_scope_refusal": pred_out_refusal,
+                "pred_has_source_reference": pred_has_source,
+                "pred_has_valid_source_reference": pred_valid_source,
+                "pred_has_invalid_source_reference": pred_invalid_source,
+                "pred_is_too_generic_grounded_answer": pred_generic,
+                "pred_italian_style": pred_style,
+            }
+        )
     metrics = {name: (sum(values) / len(values) if values else None) for name, values in sums.items()}
     metrics["subset_counts"] = counts
     return scored, metrics

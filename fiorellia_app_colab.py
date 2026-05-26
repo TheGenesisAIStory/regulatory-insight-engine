@@ -15,7 +15,7 @@ def run_final_tests(adapter_path: Path, history_path: Path, output_path: Path) -
     client = choose_client(adapter_path)
     results: list[dict[str, Any]] = []
     for case in SMOKE_CASES:
-        answer, score, no_answer, meta = answer_query(case["query"], client, history_path)
+        answer, score, no_answer, meta = answer_query(case["query"], client, history_path, case.get("retrieved_context", ""))
         expected = bool(case["expected_no_answer"])
         results.append(
             {
