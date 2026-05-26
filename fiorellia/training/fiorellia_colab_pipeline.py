@@ -97,7 +97,7 @@ def check_cuda(require_gpu: bool = True) -> dict[str, Any]:
         "device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
     }
     if require_gpu and not info["cuda_available"]:
-        fail("CUDA GPU not available. In Colab select a GPU runtime, e.g. T4.")
+        fail("CUDA GPU not available. In Colab select an A100 GPU runtime for the final Fiorell.IA run.")
     return info
 
 

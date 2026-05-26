@@ -162,6 +162,7 @@ final_verdict.md
 - `docs/LOCAL_GITHUB_SYNC.md` — come aggiornare locale e GitHub.
 - `docs/RELEASE_CHECKLIST.md` — checklist finale GO-LIVE.
 - `docs/PRODUCTION_EXPERIMENTAL.md` — distinzione tra componenti produttive/sperimentali.
+- `fiorellia/MODEL_CARD.md` — model card Fiorell.IA con stato reale, limiti e riserve.
 
 ---
 

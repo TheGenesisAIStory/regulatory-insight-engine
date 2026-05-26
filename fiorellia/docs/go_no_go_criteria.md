@@ -21,7 +21,7 @@ All of the following must be true:
 Any of the following forces NO-GO:
 
 - preflight fails and training cannot start;
-- adapter is not trained;
+- adapter candidate is missing or incomplete;
 - adapted eval is missing;
 - false answers increase;
 - priority cases include a severe false answer;
@@ -32,6 +32,6 @@ Any of the following forces NO-GO:
 
 ## Current Decision
 
-Current status: **NO-GO / Not yet publishable**
+Current status: **GO CON RISERVA / Not yet public-demo GO**
 
-Reason: a dedicated training environment now passes preflight, but Qwen2.5-3B adapter training did not complete in this session. No adapted checkpoint or adapted evaluation exists.
+Reason: the adapter candidate validates and the Drive handoff is complete, but full baseline-vs-adapter metrics must still be generated on Colab A100 before a public/demo GO.

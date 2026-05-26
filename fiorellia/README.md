@@ -47,6 +47,12 @@ Guida completa:
 docs/FIORELLIA_EVAL_GUIDE.md
 ```
 
+Model card:
+
+```text
+fiorellia/MODEL_CARD.md
+```
+
 Script finale Colab/Drive:
 
 ```text

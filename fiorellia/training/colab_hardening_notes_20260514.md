@@ -26,7 +26,7 @@ required = ["base_model_name", "output_dir", "dataset_path", "target_modules", "
 missing = [k for k in required if k not in config]
 assert not missing, f"Missing required config keys: {missing}"
 assert config["base_model_name"] == "Qwen/Qwen2.5-3B-Instruct", "Unexpected base model change"
-assert torch.cuda.is_available(), "CUDA GPU not available. In Colab: Runtime > Change runtime type > T4 GPU"
+assert torch.cuda.is_available(), "CUDA GPU not available. In Colab: Runtime > Change runtime type > A100 GPU"
 print("GPU:", torch.cuda.get_device_name(0))
 ```
 
@@ -45,7 +45,7 @@ with zipfile.ZipFile(ADAPTER_ZIP) as zf:
 
 ## Dependency guardrail
 
-Keep dependency installation in one cell and avoid mixing unpinned upgrades later in the notebook. If conflicts appear on Colab T4, prefer a single conservative pin-set rather than scattered `pip install -U` cells.
+Keep dependency installation in one cell and avoid mixing unpinned upgrades later in the notebook. If conflicts appear on Colab A100, prefer a single conservative pin-set rather than scattered `pip install -U` cells.
 
 Suggested minimal pattern:
 
@@ -63,13 +63,13 @@ pip install -q \
 
 ## Manual Colab test checklist
 
-1. Open the training notebook on a clean Colab T4 runtime.
+1. Open the training notebook on a clean Colab A100 runtime.
 2. Run dependency install once, then restart runtime only if Colab asks for it.
 3. Run preflight; verify config, dataset path, CUDA GPU and base model.
 4. Run training with `fiorellia/training/configs/config_lora_behavior_20260421.yaml`.
 5. Verify adapter directory contains `adapter_config.json` and `adapter_model.safetensors`.
 6. Verify export zip is written to Google Drive.
-7. Open eval notebook on a clean Colab T4 runtime.
+7. Open eval notebook on a clean Colab A100 runtime.
 8. Mount Drive and validate adapter zip before extraction.
 9. Verify system prompt, eval set and baseline JSONL are present before generation.
 10. Run eval and confirm JSONL + CSV comparative outputs are produced.

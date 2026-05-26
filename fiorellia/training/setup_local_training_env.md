@@ -12,7 +12,7 @@ source .venv-fiorellia-lora/bin/activate
 python -m pip install --upgrade pip
 ```
 
-If `python3.11` is not available, install or activate any Python 3.10+ interpreter first. The current system Python 3.9.6 is not sufficient for the conservative training workflow.
+If `python3.11` is not available, install or activate any Python 3.10+ interpreter first. The conservative training workflow requires Python 3.10+.
 
 Install PyTorch first using the official selector for your machine:
 
