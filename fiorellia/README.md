@@ -65,6 +65,12 @@ Script unico per training finale, eval, app test e verdict:
 fiorellia/training/final_colab_certification.py
 ```
 
+Notebook operativo equivalente per VS Code collegato a Colab A100:
+
+```text
+fiorellia_final_colab_a100_release.ipynb
+```
+
 Output atteso:
 
 ```text

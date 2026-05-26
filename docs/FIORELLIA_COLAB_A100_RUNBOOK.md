@@ -84,6 +84,14 @@ python fiorellia/training/final_colab_certification.py \
   --copy-verdict-to-repo
 ```
 
+For VS Code connected to a Colab A100 kernel, open and run:
+
+```text
+fiorellia_final_colab_a100_release.ipynb
+```
+
+The notebook wraps the same release script and also handles Drive mount, CUDA/A100 verification, stale artifact archival, final artifact validation, GitHub publication of the real final reports, and the final Gradio `--share` launch after a `GO DEFINITIVO` verdict.
+
 The script fails fast unless CUDA is visible and the GPU is an A100. It then:
 
 - trains `fiorellia_behavior_FINAL_RELEASE` on the patched style/abstention dataset;

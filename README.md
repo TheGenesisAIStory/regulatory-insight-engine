@@ -33,6 +33,12 @@ Runbook attivo Fiorell.IA Colab A100:
 docs/FIORELLIA_COLAB_A100_RUNBOOK.md
 ```
 
+Notebook operativo per VS Code collegato a Colab A100:
+
+```text
+fiorellia_final_colab_a100_release.ipynb
+```
+
 Il flusso operativo Fiorell.IA attivo è solo Colab/Drive-first. Eventuali file storici di deployment cloud restano fuori dal percorso di training, eval e rilascio finale.
 
 ---
