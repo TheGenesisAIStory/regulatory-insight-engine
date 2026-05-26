@@ -47,6 +47,12 @@ Guida completa:
 docs/FIORELLIA_EVAL_GUIDE.md
 ```
 
+Script finale Colab/Drive:
+
+```text
+fiorellia/eval/colab_drive_final_eval.py
+```
+
 Output atteso:
 
 ```text

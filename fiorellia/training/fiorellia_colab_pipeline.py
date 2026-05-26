@@ -130,8 +130,15 @@ def zip_adapter(adapter_dir: str | Path, zip_path: str | Path) -> Path:
         target.unlink()
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for item in sorted(adapter.rglob("*")):
+            rel = item.relative_to(adapter)
+            if any(part.startswith("checkpoint-") for part in rel.parts):
+                continue
+            if any(part in {"runs", "logs"} for part in rel.parts):
+                continue
+            if item.name == ".DS_Store" or item.suffix == ".bin":
+                continue
             if item.is_file():
-                zf.write(item, arcname=str(item.relative_to(adapter)))
+                zf.write(item, arcname=str(rel))
     return validate_adapter_zip(target)
 
 

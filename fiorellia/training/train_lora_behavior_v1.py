@@ -297,13 +297,13 @@ def main() -> int:
         "--dataset-path",
         type=Path,
         default=None,
-        help="Optional dataset override, useful when Azure ML mounts the JSONL as a job input.",
+        help="Optional dataset override, useful when Colab or another local runtime mounts the JSONL as an input.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Optional adapter output override, useful when Azure ML captures a job output folder.",
+        help="Optional adapter output override, useful when Colab or another local runtime captures an output folder.",
     )
     args = parser.parse_args()
 

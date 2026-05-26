@@ -18,12 +18,12 @@ Controlla di avere:
 2. system prompt;
 3. eval set;
 4. baseline JSONL, se previsto dal confronto;
-5. runtime Colab con GPU T4.
+5. runtime Colab con GPU A100.
 
 Path consigliato adapter:
 
 ```text
-/content/drive/MyDrive/fiorellia/training_final/fiorellia_lora_adapter.zip
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/fiorellia_behavior_20260421_clean.zip
 ```
 
 ## Cosa fa il notebook
@@ -50,7 +50,7 @@ final_verdict.md
 Cartella consigliata:
 
 ```text
-/content/drive/MyDrive/fiorellia/eval_final/
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/
 ```
 
 ## Metriche principali

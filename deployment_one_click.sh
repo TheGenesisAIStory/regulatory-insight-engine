@@ -27,13 +27,6 @@ if [[ -d "$DRIVE_DIR" ]]; then
   mkdir -p "${DRIVE_DIR}/dist"
   cp "$DIST_ZIP" "${DRIVE_DIR}/dist/"
 
-  if [[ -f "${ROOT_DIR}/azure_deploy_summary.json" ]]; then
-    echo "==> Copying Azure deploy summary to Google Drive project folder"
-    cp "${ROOT_DIR}/azure_deploy_summary.json" "$DRIVE_DIR/"
-  else
-    echo "==> Azure deploy summary not found locally; skipping summary sync"
-  fi
-
   if compgen -G "${ROOT_DIR}/history_export_*.json" >/dev/null; then
     echo "==> Copying exported history JSON files to Google Drive project folder"
     cp "${ROOT_DIR}"/history_export_*.json "$DRIVE_DIR/"

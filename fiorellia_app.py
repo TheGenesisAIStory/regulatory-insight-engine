@@ -6,7 +6,6 @@ import json
 import os
 import re
 import time
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -14,7 +13,6 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_ADAPTER = ROOT / "fiorellia" / "training" / "lora" / "fiorellia_behavior_20260421"
-DEFAULT_SUMMARY = ROOT / "azure_deploy_summary.json"
 DEFAULT_HISTORY = ROOT / "fiorellia_app_history.jsonl"
 
 SYSTEM_PROMPT = (ROOT / "fiorellia" / "prompts" / "system_prompt.txt").read_text(encoding="utf-8")
@@ -58,53 +56,6 @@ def confidence(answer: str, no_answer: bool) -> tuple[str, float]:
     if "Fonti:" in answer and "-" in answer.split("Fonti:", 1)[-1]:
         return "medium", 0.72
     return "low", 0.42
-
-
-def normalize_endpoint_result(payload: Any) -> dict[str, Any]:
-    if isinstance(payload, list) and payload:
-        payload = payload[0]
-    if isinstance(payload, dict) and "predictions" in payload:
-        predictions = payload["predictions"]
-        payload = predictions[0] if isinstance(predictions, list) and predictions else predictions
-    if not isinstance(payload, dict):
-        payload = {"answer": str(payload)}
-
-    answer = str(payload.get("answer") or payload.get("output") or payload.get("response") or payload)
-    no_answer = bool(payload.get("noAnswer", payload.get("no_answer", ABSTENTION_RE.search(answer) is not None)))
-    label, score = confidence(answer, no_answer)
-    return {
-        "answer": answer,
-        "confidence": payload.get("confidence") or label,
-        "confidenceScore": float(payload.get("confidenceScore", payload.get("confidence_score", score))),
-        "noAnswer": no_answer,
-        "reason": payload.get("reason"),
-        "model": payload.get("model", "azure-ml-endpoint"),
-    }
-
-
-class AzureEndpointClient:
-    def __init__(self, summary_path: Path):
-        summary = load_json(summary_path)
-        self.endpoint_url = os.getenv("FIORELLIA_AZURE_ENDPOINT") or summary.get("endpoint_url")
-        self.api_key = os.getenv("FIORELLIA_AZURE_API_KEY") or summary.get("api_key")
-        self.deployment_name = os.getenv("FIORELLIA_AZURE_DEPLOYMENT") or summary.get("deployment_name")
-
-    @property
-    def available(self) -> bool:
-        return bool(self.endpoint_url and self.api_key)
-
-    def ask(self, query: str) -> dict[str, Any]:
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-        }
-        if self.deployment_name:
-            headers["azureml-model-deployment"] = self.deployment_name
-        body = json.dumps({"query": query}).encode("utf-8")
-        request = urllib.request.Request(self.endpoint_url, data=body, headers=headers, method="POST")
-        with urllib.request.urlopen(request, timeout=120) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        return normalize_endpoint_result(payload)
 
 
 class LocalLoraClient:
@@ -208,7 +159,7 @@ class SafeFallbackClient:
                 "Fonti:\n"
                 "- Nessuna fonte locale recuperata nella sessione corrente.\n\n"
                 "Nota:\n"
-                "Avviare il backend RAG o configurare l'endpoint Azure ML per risposte supportate da fonti."
+                "Avviare il backend RAG o configurare un adapter locale valido per risposte supportate da fonti."
             ),
             "confidence": "low",
             "confidenceScore": 0.18,
@@ -218,10 +169,7 @@ class SafeFallbackClient:
         }
 
 
-def choose_client(summary_path: Path, adapter_path: Path) -> Any:
-    azure = AzureEndpointClient(summary_path)
-    if azure.available:
-        return azure
+def choose_client(adapter_path: Path) -> Any:
     if os.getenv("FIORELLIA_DISABLE_LOCAL_MODEL") == "1":
         return SafeFallbackClient()
     local = LocalLoraClient(adapter_path)
@@ -255,26 +203,77 @@ def answer_query(query: str, client: Any, history_path: Path) -> tuple[str, floa
     )
 
 
-def run_smoke_test(summary_path: Path, adapter_path: Path, history_path: Path) -> int:
-    azure = AzureEndpointClient(summary_path)
-    if azure.available:
-        client = azure
-    elif os.getenv("FIORELLIA_SMOKE_LOAD_MODEL") == "1":
-        client = choose_client(summary_path, adapter_path)
-    else:
-        client = SafeFallbackClient()
-    answer, score, no_answer, meta = answer_query(
-        "Quali disclosure Pillar 3 specifiche pubblica Intesa Sanpaolo nell'ultimo report disponibile?",
-        client,
-        history_path,
+SMOKE_CASES = [
+    {
+        "id": "grounded_in_scope",
+        "query": "Quali sono i principali requisiti sui fondi propri nel CRR?",
+        "expected_no_answer": False,
+    },
+    {
+        "id": "unsupported_request",
+        "query": "Quali sono tutte le disclosure Pillar 3 richieste alle banche italiane nel 2026?",
+        "expected_no_answer": True,
+    },
+    {
+        "id": "out_of_scope_request",
+        "query": "Quale ETF UCITS consigli per espormi ai Treasury USA?",
+        "expected_no_answer": True,
+    },
+    {
+        "id": "critical_current_data",
+        "query": "Mi dai la classifica aggiornata 2026 delle prime banche italiane per total assets?",
+        "expected_no_answer": True,
+    },
+    {
+        "id": "bank_specific_without_source",
+        "query": "Quali metriche Pillar 3 specifiche pubblica Intesa Sanpaolo nell'ultimo report disponibile?",
+        "expected_no_answer": True,
+    },
+]
+
+
+def run_smoke_test(adapter_path: Path, history_path: Path) -> int:
+    adapter_available = LocalLoraClient(adapter_path).available
+    load_model = os.getenv("FIORELLIA_SMOKE_LOAD_MODEL") == "1"
+    client = choose_client(adapter_path) if load_model else SafeFallbackClient()
+    results = []
+    for case in SMOKE_CASES:
+        answer, score, no_answer, meta = answer_query(case["query"], client, history_path)
+        expected = bool(case["expected_no_answer"])
+        ok = no_answer == expected
+        if not load_model and case["id"] == "grounded_in_scope":
+            ok = no_answer is True
+        results.append(
+            {
+                "id": case["id"],
+                "ok": ok,
+                "expectedNoAnswer": expected,
+                "noAnswer": no_answer,
+                "confidenceScore": score,
+                "meta": meta,
+                "answerPreview": answer[:220],
+            }
+        )
+    verdict = "GO" if load_model and all(item["ok"] for item in results) else "GO_CON_RISERVA"
+    print(
+        json.dumps(
+            {
+                "verdict": verdict,
+                "adapterPath": str(adapter_path),
+                "adapterAvailable": adapter_available,
+                "modelLoadRequested": load_model,
+                "historyPath": str(history_path),
+                "results": results,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
     )
-    print(json.dumps({"answer": answer, "confidenceScore": score, "noAnswer": no_answer, "meta": meta}, indent=2))
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the Fiorell.IA Gradio release app.")
-    parser.add_argument("--summary", type=Path, default=Path(os.getenv("FIORELLIA_AZURE_SUMMARY_PATH", DEFAULT_SUMMARY)))
     parser.add_argument("--adapter-path", type=Path, default=Path(os.getenv("FIORELLIA_ADAPTER_PATH", DEFAULT_ADAPTER)))
     parser.add_argument("--history", type=Path, default=Path(os.getenv("FIORELLIA_HISTORY_PATH", DEFAULT_HISTORY)))
     parser.add_argument("--host", default=os.getenv("FIORELLIA_GRADIO_HOST", "127.0.0.1"))
@@ -283,14 +282,14 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.smoke_test:
-        return run_smoke_test(args.summary, args.adapter_path, args.history)
+        return run_smoke_test(args.adapter_path, args.history)
 
     try:
         import gradio as gr
     except ImportError as exc:
         raise SystemExit("Gradio is not installed. Run: python -m pip install gradio") from exc
 
-    client = choose_client(args.summary, args.adapter_path)
+    client = choose_client(args.adapter_path)
 
     with gr.Blocks(title="Fiorell.IA") as demo:
         gr.Markdown("# Fiorell.IA")

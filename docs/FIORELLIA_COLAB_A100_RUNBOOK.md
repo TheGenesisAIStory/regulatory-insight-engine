@@ -1,16 +1,15 @@
 # Fiorell.IA Colab A100 Runbook
 
-This is the active release path after Azure for Students GPU quota limits.
+This is the active release path for Fiorell.IA: Google Colab Pro A100 for execution, Google Drive for artifacts, GitHub for final versioned source.
 
-Do not use Azure ML, managed endpoints, cloud VMs, or Azure GPU quota for this run. Training, adapter export, eval, and final verdict run in Google Colab Pro with an A100 runtime and Google Drive artifacts.
+Do not use managed cloud endpoints, external VMs, or non-Drive artifact stores for this run.
 
 ## Required Colab State
 
 - Runtime: Google Colab Pro, A100 GPU, high RAM.
 - Repo clone: `/content/regulatory-insight-engine`.
-- Artifact root: `/content/drive/MyDrive/fiorellia/artifacts/`.
-- Notebook: `fiorellia/training/fiorellia_lora_master_runbook.ipynb`.
-- `RUN_ENV = "colab"` remains the default in `00_config`.
+- Drive artifact root: `/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/`.
+- `RUN_ENV = "colab"` remains the default in notebook config cells.
 
 ## Permanent Repo Fixes
 
@@ -23,35 +22,54 @@ The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink worka
 - `fiorellia/eval/eval_set.jsonl`
 - `fiorellia/eval/baseline.jsonl`
 
-## Eval Flow
+## Adapter ZIP
 
-The master notebook now runs the adapter eval harness before finalization:
+Preferred Drive ZIP:
 
-```bash
-python fiorellia/eval/prompt_harness.py \
-  --adapter_zip /content/drive/MyDrive/fiorellia/artifacts/fiorellia_lora_adapter.zip \
-  --eval_set fiorellia/eval/eval_set.jsonl \
-  --system_prompt fiorellia/prompts/system_prompt.md \
-  --output fiorellia/eval/reports/
+```text
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/fiorellia_behavior_20260421_clean.zip
 ```
 
-The harness writes:
+Fallback Drive ZIPs are resolved by the final eval script if present:
 
-- `fiorellia/eval/reports/adapter_eval.jsonl`
+```text
+/content/drive/MyDrive/fiorellia-runs/fiorellia_behavior_20260421.zip
+/content/drive/MyDrive/fiorellia/artifacts/fiorellia_lora_adapter.zip
+```
 
-The final notebook cell reads that JSONL, scores it with `score_eval_rows`, and writes:
+The ZIP must contain:
 
-- `/content/drive/MyDrive/fiorellia/artifacts/metrics_summary.json`
-- `/content/drive/MyDrive/fiorellia/artifacts/eval_diagnostics.json`
-- `/content/drive/MyDrive/fiorellia/artifacts/adapter_eval_scored.jsonl`
-- `/content/drive/MyDrive/fiorellia/artifacts/final_verdict.md`
+```text
+adapter_config.json
+adapter_model.safetensors
+```
 
-`metrics_summary.json` contains only the three release metrics as floats in `[0, 1]`:
+## Final Eval Flow
+
+From the Colab repo root:
+
+```bash
+python fiorellia/eval/colab_drive_final_eval.py
+```
+
+The script runs the adapter prompt harness, scores real outputs, compares baseline vs adapter, and writes:
+
+```text
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/reports/adapter_eval.jsonl
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/adapter_eval_scored.jsonl
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/comparison.csv
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/metrics_summary.json
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/eval_diagnostics.json
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/final_verdict.md
+```
+
+`metrics_summary.json` contains only real float metrics:
 
 - `in_scope_grounded`
 - `unsupported_abstention`
 - `out_of_scope_refusal`
+- `italian_style`
 
 ## Clean Restart
 
-Before a full Colab rerun, use `Runtime -> Restart session and run all`. The notebook removes stale `metrics_summary*.json` and `final_verdict*.md` artifacts before producing new verdict files.
+Before a full Colab rerun, use `Runtime -> Restart session and run all`. The final eval script removes stale `metrics_summary*.json` and `final_verdict*.md` files before writing a fresh verdict.

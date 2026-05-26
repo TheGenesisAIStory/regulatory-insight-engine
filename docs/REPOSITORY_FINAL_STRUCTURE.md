@@ -5,7 +5,7 @@ Questa pagina definisce la struttura finale consigliata per `regulatory-insight-
 Root locale ufficiale:
 
 ```text
-/Users/itsgennymac/Documents/GitHub/regulatory-insight-engine
+/Users/itsgennymac/GitHub/regulatory-insight-engine
 ```
 
 ## Obiettivo della struttura
@@ -112,12 +112,13 @@ In Colab usare:
 /content/drive/MyDrive/fiorellia/training_final/
 /content/drive/MyDrive/fiorellia/eval_final/
 /content/drive/MyDrive/fiorellia/nogo_recovery/
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/
 ```
 
 In locale usare:
 
 ```text
-/Users/itsgennymac/Documents/GitHub/regulatory-insight-engine/artifacts/fiorellia/
+/Users/itsgennymac/GitHub/regulatory-insight-engine/artifacts/fiorellia/
 ```
 
 ## Regola finale

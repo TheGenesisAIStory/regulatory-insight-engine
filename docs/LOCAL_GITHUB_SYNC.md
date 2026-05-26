@@ -3,7 +3,7 @@
 Questa guida usa sempre la root locale ufficiale:
 
 ```text
-/Users/itsgennymac/Documents/GitHub/regulatory-insight-engine
+/Users/itsgennymac/GitHub/regulatory-insight-engine
 ```
 
 ## Obiettivo
@@ -17,7 +17,7 @@ Tenere allineati:
 ## Passo 1 — Apri il terminale nella cartella corretta
 
 ```bash
-cd '/Users/itsgennymac/Documents/GitHub/regulatory-insight-engine'
+cd '/Users/itsgennymac/GitHub/regulatory-insight-engine'
 ```
 
 ## Passo 2 — Controlla lo stato

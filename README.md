@@ -33,11 +33,7 @@ Runbook attivo Fiorell.IA Colab A100:
 docs/FIORELLIA_COLAB_A100_RUNBOOK.md
 ```
 
-Runbook Azure/Gradio legacy, non attivo per il training finale perché la subscription Azure for Students non ha quota GPU:
-
-```text
-docs/FIORELLIA_AZURE_RELEASE.md
-```
+Il flusso operativo Fiorell.IA attivo è solo Colab/Drive-first. Eventuali file storici di deployment cloud restano fuori dal percorso di training, eval e rilascio finale.
 
 ---
 
@@ -174,7 +170,7 @@ final_verdict.md
 Per lavorare in locale usa sempre:
 
 ```text
-/Users/itsgennymac/Documents/GitHub/regulatory-insight-engine
+/Users/itsgennymac/GitHub/regulatory-insight-engine
 ```
 
 Guida sincronizzazione:

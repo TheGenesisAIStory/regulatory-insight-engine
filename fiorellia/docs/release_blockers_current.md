@@ -1,28 +1,36 @@
-# Current Release Blockers
+# Current Release Status
 
-Fiorell.IA is not ready for a public GitHub / LinkedIn / public demo release yet.
+Fiorell.IA is in a Drive-first recovery release state. The local repository now has a validated LoRA adapter candidate, but public/demo GO still requires a completed Colab A100 baseline-vs-adapter evaluation with real metrics.
 
-## Blockers
+## Status
 
-- Adapter not trained yet.
-- No baseline-vs-adapted comparison exists yet.
-- No validated beta release evidence exists for the LoRA candidate.
-- A dedicated `.venv-fiorellia-lora` environment now passes preflight.
-- The first Qwen2.5-3B training attempt did not complete: model download remained in `Fetching 2 files`, reached only about `223 MB` of Hugging Face cache, and was stopped before training.
-- Current host is macOS Intel x86_64 with 16 GB RAM and no CUDA; 4-bit QLoRA via `bitsandbytes` is not practical here.
-- No trained adapter exists.
+- OK: `.venv-fiorellia-lora` passes the local training preflight.
+- OK: `Qwen/Qwen2.5-3B-Instruct` is present in the local Hugging Face cache.
+- OK: local adapter directory `fiorellia/training/lora/fiorellia_behavior_20260421/` contains `adapter_config.json` and `adapter_model.safetensors`.
+- OK: a clean adapter ZIP can be produced without checkpoints or local binary spillover.
+- OK: app smoke tests run through the safe fallback path and verify abstention/error handling.
+- DA VERIFICARE: full adapter generation and eval must run on Google Colab A100.
+- DA VERIFICARE: `metrics_summary.json`, `comparison.csv`, `adapter_eval_scored.jsonl`, and `final_verdict.md` must be produced from real adapter outputs.
+- BLOCCANTE LOCALE: macOS Intel CPU can load Qwen2.5-3B+LoRA but does not complete even a 1-token generation probe in practical time.
 
-## Conditions To Lift Blockers
+## Active Closure Path
 
-These blockers can be lifted only when:
+Run the final eval on Colab A100 from the repository root:
 
-1. the local LoRA training environment passes preflight;
-2. `Qwen/Qwen2.5-3B-Instruct` is available locally or download completes reliably;
-3. the first behavior adapter is trained successfully;
-4. adapted outputs are generated for `eval_set_v0.jsonl`;
-5. the four priority unsupported cases are manually reviewed;
-6. the full eval set is reviewed for regressions;
-7. `fiorellia/training/experiments/fiorellia_runs.jsonl` records the result;
-8. the go/no-go decision is explicit and conservative.
+```bash
+python fiorellia/eval/colab_drive_final_eval.py
+```
 
-Until then, Fiorell.IA remains an internal, evaluation-stage beta candidate.
+Expected Drive artifact root:
+
+```text
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/
+```
+
+Public release language remains conservative until the Colab A100 eval produces a real GO:
+
+- narrow prudential beta;
+- Italian-first;
+- source-grounded;
+- refusal-first;
+- internal/evaluation-stage until metrics pass.

@@ -43,8 +43,8 @@ def parse_args() -> argparse.Namespace:
         "--config",
         default="fiorellia/training/configs/config_lora_behavior_20260421.yaml",
     )
-    parser.add_argument("--artifact-root", default="/content/drive/MyDrive/fiorellia/artifacts")
-    parser.add_argument("--eval-jsonl", default="/content/drive/MyDrive/fiorellia/artifacts/eval_adapter.jsonl")
+    parser.add_argument("--artifact-root", default="/content/drive/MyDrive/fiorellia-runs/final_delivery_latest")
+    parser.add_argument("--eval-jsonl", default="/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/reports/adapter_eval.jsonl")
     parser.add_argument("--target-abstention-ratio", type=float, default=0.40)
     parser.add_argument("--skip-gpu-check", action="store_true")
     return parser.parse_args()

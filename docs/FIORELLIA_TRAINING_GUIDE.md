@@ -16,7 +16,7 @@ Controlla di avere:
 
 1. un account Google;
 2. Google Drive disponibile;
-3. runtime Colab con GPU T4;
+3. runtime Colab Pro con GPU A100;
 4. repository clonato o accessibile nel notebook;
 5. dataset training presente:
 
@@ -37,7 +37,7 @@ fiorellia/training/configs/config_lora_behavior_20260421.yaml
 Apri il notebook e scegli:
 
 ```text
-Runtime > Change runtime type > T4 GPU
+Runtime > Change runtime type > A100 GPU
 ```
 
 ### Passo 2 — Esegui le celle dall’alto verso il basso
@@ -71,7 +71,7 @@ A fine training il notebook crea lo ZIP dell’adapter.
 Output atteso:
 
 ```text
-/content/drive/MyDrive/fiorellia/training_final/fiorellia_lora_adapter.zip
+/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/fiorellia_behavior_20260421_clean.zip
 ```
 
 ### Passo 6 — Conclusione finale
@@ -100,7 +100,7 @@ training_final_summary.md
 Soluzione:
 
 ```text
-Runtime > Change runtime type > T4 GPU
+Runtime > Change runtime type > A100 GPU
 ```
 
 Poi riesegui il notebook dall’inizio.
