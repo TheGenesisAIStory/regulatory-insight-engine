@@ -59,6 +59,12 @@ Script finale Colab/Drive:
 fiorellia/eval/colab_drive_final_eval.py
 ```
 
+Script unico per training finale, eval, app test e verdict:
+
+```text
+fiorellia/training/final_colab_certification.py
+```
+
 Output atteso:
 
 ```text

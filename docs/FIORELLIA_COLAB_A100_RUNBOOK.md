@@ -73,3 +73,29 @@ The script runs the adapter prompt harness, scores real outputs, compares baseli
 ## Clean Restart
 
 Before a full Colab rerun, use `Runtime -> Restart session and run all`. The final eval script removes stale `metrics_summary*.json` and `final_verdict*.md` files before writing a fresh verdict.
+
+## Final Certification Flow
+
+To move from `GO CON RISERVA` to a real final verdict, run the all-in-one A100 certification script from the Colab repo root:
+
+```bash
+python fiorellia/training/final_colab_certification.py \
+  --install-deps \
+  --copy-verdict-to-repo
+```
+
+The script fails fast unless CUDA is visible and the GPU is an A100. It then:
+
+- trains `fiorellia_behavior_FINAL_RELEASE` on the patched style/abstention dataset;
+- saves `fiorellia_behavior_FINAL_RELEASE.zip` to `/content/drive/MyDrive/fiorellia-runs/final_delivery_latest/`;
+- runs adapter eval with `prompt_harness_local_adapter.py`;
+- writes `metrics_summary.json`, `comparison.csv`, `adapter_eval_scored.jsonl`, `eval_diagnostics.json`, and `final_verdict.md`;
+- runs the required app smoke tests and writes `app_final_test_results.json`.
+
+If the final verdict is `GO DEFINITIVO`, run the Colab app:
+
+```bash
+python fiorellia_app_colab.py \
+  --adapter-path /content/fiorellia_behavior_FINAL_RELEASE \
+  --share
+```
