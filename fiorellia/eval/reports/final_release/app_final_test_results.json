@@ -1,0 +1,80 @@
+{
+  "verdict": "GO_CON_RISERVA",
+  "adapterPath": "/content/fiorellia_behavior_FINAL_RELEASE",
+  "adapterAvailable": true,
+  "modelLoadRequested": true,
+  "historyPath": "/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/final_delivery_latest/app_final_history.jsonl",
+  "results": [
+    {
+      "id": "grounded_in_scope",
+      "ok": true,
+      "expectedNoAnswer": false,
+      "noAnswer": false,
+      "confidenceScore": 0.72,
+      "meta": {
+        "confidence": "medium",
+        "reason": null,
+        "model": "local-lora:fiorellia_behavior_FINAL_RELEASE",
+        "durationMs": 22219
+      },
+      "answerPreview": "Risposta:\nI principali requisiti sui fondi propri nel CRR includono la necessita di mantenere un fondo di riserva sufficiente per coprire eventuali perdite fino a un certo livello di rischio.\n\nFonti:\n- CRR - Articolo 46\n"
+    },
+    {
+      "id": "unsupported_request",
+      "ok": false,
+      "expectedNoAnswer": true,
+      "noAnswer": false,
+      "confidenceScore": 0.72,
+      "meta": {
+        "confidence": "medium",
+        "reason": null,
+        "model": "local-lora:fiorellia_behavior_FINAL_RELEASE",
+        "durationMs": 5548
+      },
+      "answerPreview": "Nota: Non sono state trovate fonti locali che specificano le dichiarazioni di Pillar 3 richieste alle banche italiane nel 2026.\n\nFonti:\n- \n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale."
+    },
+    {
+      "id": "out_of_scope_request",
+      "ok": false,
+      "expectedNoAnswer": true,
+      "noAnswer": false,
+      "confidenceScore": 0.72,
+      "meta": {
+        "confidence": "medium",
+        "reason": null,
+        "model": "local-lora:fiorellia_behavior_FINAL_RELEASE",
+        "durationMs": 4206
+      },
+      "answerPreview": "Nota: Non ci sono fonti locali recuperate che supportano questa domanda specifica.\n\nFonti:\n- Nessuna\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale."
+    },
+    {
+      "id": "critical_current_data",
+      "ok": false,
+      "expectedNoAnswer": true,
+      "noAnswer": false,
+      "confidenceScore": 0.72,
+      "meta": {
+        "confidence": "medium",
+        "reason": null,
+        "model": "local-lora:fiorellia_behavior_FINAL_RELEASE",
+        "durationMs": 3729
+      },
+      "answerPreview": "Risposta:\nNon ci sono fonti locali che supportano questa domanda.\n\nFonti:\n- \n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale."
+    },
+    {
+      "id": "bank_specific_without_source",
+      "ok": false,
+      "expectedNoAnswer": true,
+      "noAnswer": false,
+      "confidenceScore": 0.72,
+      "meta": {
+        "confidence": "medium",
+        "reason": null,
+        "model": "local-lora:fiorellia_behavior_FINAL_RELEASE",
+        "durationMs": 3720
+      },
+      "answerPreview": "Nota: Non sono state trovate fonti locali che specificano le metriche Pillar 3 pubblicate da Intesa Sanpaolo nell'ultimo report disponibile.\n\nFonti:\n-"
+    }
+  ],
+  "ok": false
+}

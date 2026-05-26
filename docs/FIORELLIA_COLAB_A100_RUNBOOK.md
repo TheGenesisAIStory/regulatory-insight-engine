@@ -112,7 +112,7 @@ For VS Code connected to a Colab A100 kernel, open and run:
 fiorellia_final_colab_a100_release.ipynb
 ```
 
-The notebook wraps the same release script and also handles Drive mount, CUDA/A100 verification, stale artifact archival, final artifact validation, GitHub publication of the real final reports, and the final Gradio `--share` launch after a `GO DEFINITIVO` verdict.
+The notebook wraps the same release script and also handles Drive mount, CUDA/A100 verification, stale artifact archival, final artifact validation, best-effort GitHub publication of the real final reports, and the final Gradio `--share` launch after a `GO DEFINITIVO` verdict.
 
 The script fails fast unless CUDA is visible and the GPU is an A100. It then:
 
@@ -121,6 +121,10 @@ The script fails fast unless CUDA is visible and the GPU is an A100. It then:
 - runs adapter eval with `prompt_harness_local_adapter.py`;
 - writes `metrics_summary.json`, `comparison.csv`, `adapter_eval_scored.jsonl`, `eval_diagnostics.json`, and `final_verdict.md`;
 - runs the required app smoke tests and writes `app_final_test_results.json`.
+
+The notebook writes `github_publish_status.json` in the artifact directory. If Colab has no GitHub token or credential helper, the push is recorded as non-fatal and Drive remains the source of truth until the same real reports are pushed from a local authenticated checkout.
+
+The notebook writes `app_launch_status.json` in the artifact directory. If the final verdict is not `GO DEFINITIVO`, the public Gradio launch is skipped and recorded instead of publishing an unqualified app.
 
 If the final verdict is `GO DEFINITIVO`, run the Colab app:
 

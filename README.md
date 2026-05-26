@@ -50,6 +50,8 @@ Tutti i notebook Fiorell.IA attivi contengono una cella iniziale `00 - Fiorell.I
 
 Il flusso operativo Fiorell.IA attivo è solo Colab/Drive-first. Eventuali file storici di deployment cloud restano fuori dal percorso di training, eval e rilascio finale.
 
+Il notebook finale salva sempre gli esiti reali su Drive. Se Colab non può autenticarsi su GitHub, scrive `github_publish_status.json` e lascia la pubblicazione al checkout locale autenticato. Se il verdict non è `GO DEFINITIVO`, scrive `app_launch_status.json` e non apre la UI pubblica Gradio.
+
 ---
 
 ## Percorso consigliato per utenti non tecnici

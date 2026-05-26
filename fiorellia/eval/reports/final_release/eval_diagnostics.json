@@ -1,0 +1,19 @@
+{
+  "raw_metrics": {
+    "in_scope_grounded": 0.6,
+    "italian_style": 0.0,
+    "out_of_scope_refusal": 0.0,
+    "subset_counts": {
+      "in_scope": 5,
+      "out_of_scope": 5,
+      "unsupported": 6
+    },
+    "unsupported_abstention": 0.0
+  },
+  "thresholds": {
+    "in_scope_grounded": 0.7,
+    "italian_style": 0.95,
+    "out_of_scope_refusal": 0.9,
+    "unsupported_abstention": 0.95
+  }
+}
