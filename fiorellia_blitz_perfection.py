@@ -393,7 +393,32 @@ def run_adapter_eval(
     ]
     if use_4bit:
         command.append("--use-4bit")
-    run(command)
+    print("+", " ".join(str(part) for part in command))
+    completed = subprocess.run(command, cwd=ROOT, check=False, capture_output=True, text=True)
+    log_path = output_path.with_suffix(output_path.suffix + ".subprocess.log")
+    log_path.write_text(
+        "\n".join(
+            [
+                "$ " + " ".join(str(part) for part in command),
+                "",
+                "## STDOUT",
+                completed.stdout,
+                "",
+                "## STDERR",
+                completed.stderr,
+            ]
+        ),
+        encoding="utf-8",
+    )
+    if completed.stdout:
+        print(completed.stdout[-4000:])
+    if completed.stderr:
+        print(completed.stderr[-4000:])
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "BLOCCANTE: prompt_harness_local_adapter.py failed. "
+            f"returncode={completed.returncode}; log={log_path}; command={' '.join(str(part) for part in command)}"
+        )
     return read_jsonl(output_path)
 
 
@@ -511,7 +536,7 @@ def main() -> int:
     eval_subset = artifact_dir / "eval_set_blitz_critical.jsonl"
     adapter_zip = artifact_dir / f"{args.final_name}.zip"
 
-    if args.install_deps and not args.dry_run:
+    if (args.install_deps or args.reuse_existing_adapter) and not args.dry_run:
         install_blitz_deps(try_flash_attn=args.try_flash_attn_install and not args.no_flash_attn)
     runtime = (
         {"dry_run": True, "cuda_check": "skipped"}
