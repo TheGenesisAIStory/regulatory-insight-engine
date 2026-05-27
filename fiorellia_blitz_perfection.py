@@ -461,7 +461,7 @@ def evaluate_blitz(
     max_new_tokens: int,
     use_flash_attention: bool,
     eval_4bit: bool,
-) -> tuple[dict[str, float], list[dict[str, Any]], dict[str, Any]]:
+) -> tuple[dict[str, float], list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     reports_dir = artifact_dir / "reports"
     adapter_eval = reports_dir / "adapter_eval.jsonl"
     attempts = []
@@ -499,7 +499,7 @@ def evaluate_blitz(
         },
         artifact_dir / "eval_diagnostics.json",
     )
-    return metrics, scored_rows, {"adapter_eval": str(adapter_eval), "attempts": attempts, **eval_info}
+    return metrics, scored_rows, {"adapter_eval": str(adapter_eval), "attempts": attempts, **eval_info}, adapter_rows
 
 
 def launch_gradio(adapter_dir: Path, artifact_dir: Path, max_new_tokens: int) -> int:
@@ -618,7 +618,7 @@ def main() -> int:
         )
     validate_adapter_dir(adapter_dir)
     zip_adapter(adapter_dir, adapter_zip)
-    metrics, scored_rows, eval_info = evaluate_blitz(
+    metrics, scored_rows, eval_info, adapter_rows = evaluate_blitz(
         adapter_dir=adapter_dir,
         eval_subset=eval_subset,
         artifact_dir=artifact_dir,
@@ -626,7 +626,6 @@ def main() -> int:
         use_flash_attention=not args.no_flash_attn,
         eval_4bit=args.eval_4bit,
     )
-    adapter_rows = read_jsonl(Path(eval_info["adapter_eval"]))
     write_comparison(eval_rows, adapter_rows, artifact_dir / "comparison.csv")
 
     relaxed_checks = {name: metrics[name] >= threshold for name, threshold in BLITZ_THRESHOLDS.items()}
