@@ -373,6 +373,11 @@ def run_adapter_eval(
     use_flash_attention: bool,
     use_4bit: bool,
 ) -> list[dict[str, Any]]:
+    local_output_path = output_path
+    if Path("/content").exists() and str(output_path).startswith("/content/drive/"):
+        local_dir = Path("/content") / "fiorellia_blitz_eval"
+        local_dir.mkdir(parents=True, exist_ok=True)
+        local_output_path = local_dir / output_path.name
     command = [
         sys.executable,
         str(ROOT / "fiorellia" / "eval" / "prompt_harness_local_adapter.py"),
@@ -385,7 +390,7 @@ def run_adapter_eval(
         "--base-model",
         "Qwen/Qwen2.5-3B-Instruct",
         "--out",
-        str(output_path),
+        str(local_output_path),
         "--max-new-tokens",
         str(max_new_tokens),
         "--attn-implementation",
@@ -419,7 +424,19 @@ def run_adapter_eval(
             "BLOCCANTE: prompt_harness_local_adapter.py failed. "
             f"returncode={completed.returncode}; log={log_path}; command={' '.join(str(part) for part in command)}"
         )
-    return read_jsonl(output_path)
+    try:
+        rows = read_jsonl(local_output_path)
+    except Exception as exc:
+        preview_path = output_path.with_suffix(output_path.suffix + ".invalid_preview.txt")
+        preview_path.write_text(local_output_path.read_text(encoding="utf-8", errors="replace")[:8000], encoding="utf-8")
+        raise RuntimeError(
+            f"BLOCCANTE: adapter eval JSONL non leggibile: {local_output_path}; "
+            f"preview={preview_path}; error={exc}"
+        ) from exc
+    if local_output_path != output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(local_output_path, output_path)
+    return rows
 
 
 def score_adapter_eval(adapter_rows: list[dict[str, Any]]) -> tuple[dict[str, float], list[dict[str, Any]], dict[str, Any]]:
