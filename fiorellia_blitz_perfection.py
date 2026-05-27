@@ -48,6 +48,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
 )
 
 FINAL_NAME = "fiorellia_behavior_BLITZ_RELEASE_20260527"
+BLITZ_SCRIPT_VERSION = "20260527-jsonl-hardening-v2"
 SOURCE_DATASET = ROOT / "fiorellia" / "training" / "supervised_v2_behavior_hardening_20260526.jsonl"
 GOLD_DATASET = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.jsonl"
 GOLD_CARD = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.md"
@@ -600,6 +601,7 @@ def launch_gradio(adapter_dir: Path, artifact_dir: Path, max_new_tokens: int) ->
 
 
 def main() -> int:
+    print(f"Fiorell.IA Blitz script version: {BLITZ_SCRIPT_VERSION}")
     parser = argparse.ArgumentParser(description="Fiorell.IA Blitz Perfection: fast A100 recovery run.")
     parser.add_argument("--artifact-dir", type=Path, default=None)
     parser.add_argument("--release-dir", type=Path, default=None)
