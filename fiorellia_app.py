@@ -73,6 +73,7 @@ class LocalLoraClient:
         self.model = None
         self.device = "cpu"
         self.dtype = None
+        self.loaded_with_4bit = False
 
     @property
     def available(self) -> bool:
@@ -90,8 +91,9 @@ class LocalLoraClient:
 
         adapter_config = load_json(self.adapter_path / "adapter_config.json")
         base_model = adapter_config.get("base_model_name_or_path", "Qwen/Qwen2.5-3B-Instruct")
+        has_cuda = torch.cuda.is_available()
         if torch.cuda.is_available():
-            self.device = "cuda"
+            self.device = "cuda:0"
             self.dtype = torch.float16
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             self.device = "mps"
@@ -103,14 +105,38 @@ class LocalLoraClient:
         self.tokenizer = AutoTokenizer.from_pretrained(base_model, use_fast=True)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-        base = AutoModelForCausalLM.from_pretrained(
-            base_model,
-            torch_dtype=self.dtype,
-            low_cpu_mem_usage=True,
-        )
+
+        model_kwargs: dict[str, Any] = {
+            "torch_dtype": self.dtype,
+            "low_cpu_mem_usage": True,
+        }
+        if has_cuda and os.getenv("FIORELLIA_DISABLE_4BIT", "0") != "1":
+            from transformers import BitsAndBytesConfig
+
+            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+            )
+            model_kwargs["device_map"] = "auto"
+            self.loaded_with_4bit = True
+        elif has_cuda:
+            model_kwargs["device_map"] = "auto"
+
+        base = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
         self.model = PeftModel.from_pretrained(base, self.adapter_path)
-        self.model.to(self.device)
+        if not self.loaded_with_4bit and not has_cuda:
+            self.model.to(self.device)
         self.model.eval()
+        loaded_device = next(self.model.parameters()).device
+        gpu_allocated = torch.cuda.memory_allocated(0) / (1024**3) if has_cuda else 0.0
+        gpu_reserved = torch.cuda.memory_reserved(0) / (1024**3) if has_cuda else 0.0
+        print(
+            f"Model loaded on: {loaded_device}; input_device={self.device}; "
+            f"4bit={self.loaded_with_4bit}; gpu_allocated_gb={gpu_allocated:.2f}; "
+            f"gpu_reserved_gb={gpu_reserved:.2f}"
+        )
 
     def _prompt(self, query: str, retrieved_context: str = "") -> str:
         context = retrieved_context.strip() or "[nessun contesto recuperato]"

@@ -98,7 +98,7 @@ def refresh_critical_files() -> None:
         "fiorellia/eval/eval_set_behavior_hardening_v1.jsonl": "fio-v1-001",
         "fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl": "fio-v2-ua-001",
         "fiorellia/training/configs/config_lora_behavior_20260526_behavior_hardening.yaml": "fiorellia_behavior_hardening_20260526",
-        "fiorellia_app.py": "SMOKE_CASES",
+        "fiorellia_app.py": "Model loaded on:",
         "fiorellia_app_colab.py": "Fiorell.IA Colab Gradio launcher",
     }
     for relative_path, marker in critical_files.items():
