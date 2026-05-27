@@ -49,7 +49,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
 )
 
 FINAL_NAME = "fiorellia_behavior_BLITZ_RELEASE_20260527"
-BLITZ_SCRIPT_VERSION = "20260527-local-first-v3"
+BLITZ_SCRIPT_VERSION = "20260527-local-first-v4"
 SOURCE_DATASET = ROOT / "fiorellia" / "training" / "supervised_v2_behavior_hardening_20260526.jsonl"
 GOLD_DATASET = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.jsonl"
 GOLD_CARD = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.md"
@@ -679,6 +679,7 @@ def main_impl() -> int:
     parser.add_argument("--eval-cases", type=int, default=10)
     parser.add_argument("--max-new-tokens", type=int, default=96)
     parser.add_argument("--install-deps", action="store_true")
+    parser.add_argument("--skip-deps", action="store_true")
     parser.add_argument("--try-flash-attn-install", action="store_true")
     parser.add_argument("--no-flash-attn", action="store_true")
     parser.add_argument("--eval-4bit", action="store_true")
@@ -707,7 +708,7 @@ def main_impl() -> int:
     eval_subset = artifact_dir / "eval_set_blitz_critical.jsonl"
     adapter_zip = artifact_dir / f"{args.final_name}.zip"
 
-    if (args.install_deps or args.reuse_existing_adapter) and not args.dry_run:
+    if (args.install_deps or (args.reuse_existing_adapter and not args.skip_deps)) and not args.dry_run:
         install_blitz_deps(try_flash_attn=args.try_flash_attn_install and not args.no_flash_attn)
     runtime = (
         {"dry_run": True, "cuda_check": "skipped"}
