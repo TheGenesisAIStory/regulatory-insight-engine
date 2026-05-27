@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -29,8 +30,28 @@ def ensure_drive_mount() -> None:
     except Exception as exc:
         raise RuntimeError("Google Drive non disponibile nel runtime Colab.") from exc
     drive.mount("/content/drive", force_remount=False)
-    if not COLAB_DRIVE_ROOT.exists():
-        raise RuntimeError("Google Drive non montato: /content/drive/MyDrive non esiste.")
+    wait_for_path(COLAB_DRIVE_ROOT, "Google Drive root", kind="dir")
+
+
+def wait_for_path(path: Path, label: str, kind: str = "file", attempts: int = 8, base_sleep: float = 1.5) -> Path:
+    def ok() -> bool:
+        if kind == "dir":
+            return path.is_dir()
+        if kind == "any":
+            return path.exists()
+        return path.is_file()
+
+    for attempt in range(1, attempts + 1):
+        if ok():
+            size = path.stat().st_size if path.is_file() else None
+            suffix = f" size={size}" if size is not None else ""
+            print(f"OK {label}: {path}{suffix}")
+            return path
+        if attempt < attempts:
+            delay = base_sleep * attempt
+            print(f"{label} non ancora visibile su Drive: {path}; retry {attempt}/{attempts} tra {delay:.1f}s")
+            time.sleep(delay)
+    raise RuntimeError(f"{label} non disponibile dopo {attempts} tentativi: {path}")
 
 
 def resolve_repo_root() -> Path:
@@ -61,6 +82,7 @@ def ensure_file(relative_path: str, required_text: str | None = None) -> Path:
     if refresh:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(download_text(relative_path), encoding="utf-8")
+        wait_for_path(target, relative_path, kind="file")
         print(f"Updated from GitHub: {relative_path}")
     return target
 
@@ -77,6 +99,7 @@ def ensure_aliases() -> None:
         if not dst.exists() and src.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            wait_for_path(dst, dst_rel, kind="file")
             print(f"Created alias: {dst_rel}")
     for init_rel in [
         "fiorellia/__init__.py",
@@ -86,6 +109,7 @@ def ensure_aliases() -> None:
         init_path = REPO_ROOT / init_rel
         init_path.parent.mkdir(parents=True, exist_ok=True)
         init_path.touch(exist_ok=True)
+        wait_for_path(init_path, init_rel, kind="file")
 
 
 ensure_drive_mount()

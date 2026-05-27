@@ -112,16 +112,22 @@ This does not train again. It reloads `fiorellia-runs/final_delivery_latest/repo
 
 Use `fiorellia_blitz_perfection.ipynb` when the Colab A100 runtime keeps disconnecting before a full Gold run finishes. The Blitz path:
 
+- runs cost-safe local-first (`20260527-cost-safe-v5`): clone and runtime artifacts stay in `/content`;
+- synchronizes to Drive only after training/eval completes, avoiding Drive visibility races during scoring;
+- retries Drive visibility checks for expected files instead of failing on first miss;
+- uses a dependency marker in `/content/.cache/fiorellia_deps_20260527.json` to avoid repeated pip installs in the same runtime;
+- separates training/eval from the optional Gradio demo cell, so the app does not prolong the training session;
 - rebuilds the Gold dataset if the grounded repair examples are missing;
-- trains only 3 epochs;
-- starts from `per_device_train_batch_size=4` and retries with smaller batches if needed;
+- trains 3 epochs on A100, or uses a T4 fallback profile with smaller batch/epochs when A100 is unavailable;
+- starts from `per_device_train_batch_size=4` on A100 and retries with smaller batches if needed;
 - requests Flash Attention 2 and falls back to SDPA if the runtime cannot load it;
 - evaluates a balanced 10-case critical subset instead of the full release gate;
 - uses BF16/SDPA evaluation by default and retries evaluation if the first pass returns empty/error-only outputs;
-- writes artifacts to `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/blitz_delivery_latest/`;
-- can open Gradio automatically after a positive relaxed gate.
+- writes final artifacts to `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/blitz_delivery_latest/`.
 
 Blitz output is intentionally labeled `GO CON RISERVA`. It is a fast recovery/demo gate, not a replacement for `GO DEFINITIVO`.
+
+Drive sync rule: any file expected after copy/export/zip must be checked with retry and size confirmation. A first missing check on Drive is treated as sync lag, not as immediate failure.
 
 ## Permanent Repo Fixes
 

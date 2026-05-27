@@ -30,6 +30,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
     read_jsonl,
     score_eval_rows,
     validate_adapter_dir,
+    wait_for_path,
     write_csv,
     write_json,
     write_jsonl,
@@ -944,6 +945,7 @@ def copy_release_artifacts(
         if source.exists():
             target = release_dir / source.name
             shutil.copy2(source, target)
+            wait_for_path(target, f"release artifact {source.name}", kind="file")
             copied.append(str(target))
     manifest = {
         "timestamp": datetime.now(timezone.utc).isoformat(),

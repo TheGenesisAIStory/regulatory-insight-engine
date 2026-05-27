@@ -93,9 +93,20 @@ fiorellia_blitz_perfection.ipynb
 fiorellia_blitz_perfection.py
 ```
 
-La modalità Blitz usa 3 epoche, batch A100 più alto, eval critica bilanciata,
-evaluation BF16/SDPA stabile con retry diagnostico, e salva gli artefatti in
-`fiorellia-runs/blitz_delivery_latest/` e `releases/blitz_release_latest/`.
+La modalità Blitz cost-safe (`20260527-cost-safe-v5`) clona il repository in
+`/content/regulatory-insight-engine-local`, lavora fuori da Google Drive durante
+training/eval, e sincronizza su Drive solo al termine. Il notebook rileva la GPU:
+su A100 usa 3 epoche e batch più alto; su T4 usa profilo fallback con batch 1,
+2 epoche e `max_new_tokens=64` per ridurre costo e rischio OOM. La demo Gradio è
+separata dalla cella training/eval per evitare sessioni app lasciate aperte.
+
+Gli artefatti finali vengono salvati in:
+
+```text
+fiorellia-runs/blitz_delivery_latest/
+releases/blitz_release_latest/
+```
+
 Il suo esito positivo è `GO CON RISERVA`: per `GO DEFINITIVO` resta necessaria la
 certificazione Gold completa.
 

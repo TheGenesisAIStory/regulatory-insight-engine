@@ -24,6 +24,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
     read_jsonl,
     score_eval_rows,
     validate_adapter_dir,
+    wait_for_path,
     write_csv,
     write_json,
     write_jsonl,
@@ -124,6 +125,13 @@ def run(command: list[str], cwd: Path = ROOT, env: dict[str, str] | None = None)
 
 
 def optional_install_deps() -> None:
+    if os.getenv("FIORELLIA_SKIP_PIP_INSTALL") == "1":
+        print("FIORELLIA_SKIP_PIP_INSTALL=1; dependency install skipped.")
+        return
+    marker = Path("/content/.cache/fiorellia_deps_20260527.json")
+    if Path("/content").exists() and marker.exists():
+        print(f"Fiorell.IA dependency marker found; install skipped: {marker}")
+        return
     packages = [
         "transformers>=4.45,<4.58",
         "datasets>=2.20,<4.0",
@@ -137,6 +145,9 @@ def optional_install_deps() -> None:
         "pandas>=2.0",
     ]
     run([sys.executable, "-m", "pip", "install", "-q", *packages])
+    if Path("/content").exists():
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(json.dumps({"installed": True, "packages": packages}, indent=2), encoding="utf-8")
 
 
 def output_by_id(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -278,8 +289,7 @@ def main() -> int:
     write_json(preflight, artifact_dir / "final_certification_preflight.json")
 
     for required in [args.config, args.dataset, args.eval_set, args.baseline, args.system_prompt]:
-        if not required.exists():
-            raise FileNotFoundError(required)
+        wait_for_path(required, f"required input {required.name}", kind="file")
     if args.dry_run:
         print(json.dumps(preflight, indent=2, ensure_ascii=False))
         return 0
@@ -303,6 +313,7 @@ def main() -> int:
     )
     validate_adapter_dir(local_adapter_dir)
     zip_adapter(local_adapter_dir, final_zip)
+    wait_for_path(final_zip, "final adapter zip", kind="file")
 
     run(
         [
@@ -322,6 +333,7 @@ def main() -> int:
             str(args.max_new_tokens),
         ]
     )
+    wait_for_path(adapter_eval, "adapter eval output", kind="file")
 
     eval_rows = read_jsonl(args.eval_set)
     baseline_rows = read_jsonl(args.baseline)

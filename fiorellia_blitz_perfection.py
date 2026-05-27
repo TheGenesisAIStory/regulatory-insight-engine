@@ -42,6 +42,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
     read_jsonl,
     score_eval_rows,
     validate_adapter_dir,
+    wait_for_path,
     write_csv,
     write_json,
     write_jsonl,
@@ -49,7 +50,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
 )
 
 FINAL_NAME = "fiorellia_behavior_BLITZ_RELEASE_20260527"
-BLITZ_SCRIPT_VERSION = "20260527-local-first-v4"
+BLITZ_SCRIPT_VERSION = "20260527-cost-safe-v5"
 SOURCE_DATASET = ROOT / "fiorellia" / "training" / "supervised_v2_behavior_hardening_20260526.jsonl"
 GOLD_DATASET = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.jsonl"
 GOLD_CARD = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.md"
@@ -395,14 +396,16 @@ def restore_adapter_from_zip(adapter_dir: Path, candidates: list[Path]) -> dict[
     if adapter_dir.exists():
         return {"restored": False, "reason": "adapter_dir_exists", "adapter_dir": str(adapter_dir)}
     for candidate in candidates:
-        if not candidate.exists():
+        try:
+            source = wait_for_path(candidate, "adapter zip candidate", kind="file", attempts=3, base_sleep=1.0)
+        except RuntimeError:
             continue
         adapter_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(candidate) as zf:
+        with zipfile.ZipFile(source) as zf:
             corrupt = zf.testzip()
             if corrupt:
                 shutil.rmtree(adapter_dir, ignore_errors=True)
-                raise RuntimeError(f"BLOCCANTE: adapter zip corrotto: {candidate} member={corrupt}")
+                raise RuntimeError(f"BLOCCANTE: adapter zip corrotto: {source} member={corrupt}")
             zf.extractall(adapter_dir)
         try:
             validate_adapter_dir(adapter_dir)
@@ -420,7 +423,7 @@ def restore_adapter_from_zip(adapter_dir: Path, candidates: list[Path]) -> dict[
                 shutil.rmtree(adapter_dir)
                 tmp_dir.rename(adapter_dir)
             validate_adapter_dir(adapter_dir)
-        return {"restored": True, "adapter_dir": str(adapter_dir), "source_zip": str(candidate)}
+        return {"restored": True, "adapter_dir": str(adapter_dir), "source_zip": str(source)}
     raise RuntimeError(
         "BLOCCANTE: adapter locale assente e nessuno ZIP Blitz trovato su Drive. "
         f"Cercati: {[str(path) for path in candidates]}. "
@@ -447,6 +450,7 @@ def sync_tree(source: Path, target: Path) -> dict[str, Any]:
         return {"source": str(source), "target": str(target), "skipped": True, "reason": "source_missing"}
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, target, dirs_exist_ok=True)
+    wait_for_path(target, "synced directory", kind="dir")
     return {"source": str(source), "target": str(target), "skipped": False}
 
 

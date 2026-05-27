@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 import shutil
+import time
 import unicodedata
 import zipfile
 from pathlib import Path
@@ -40,20 +42,56 @@ def fail(message: str) -> None:
     raise RuntimeError(f"[Fiorell.IA preflight] {message}")
 
 
-def require_file(path: str | Path, label: str) -> Path:
+def is_drive_path(path: str | Path) -> bool:
+    text = str(Path(path).expanduser())
+    return "/content/drive/" in text or "GoogleDrive-" in text or "/Il mio Drive/" in text
+
+
+def wait_for_path(
+    path: str | Path,
+    label: str,
+    *,
+    kind: str = "any",
+    attempts: int | None = None,
+    base_sleep: float | None = None,
+) -> Path:
     p = Path(path).expanduser().resolve()
-    if not p.exists() or not p.is_file():
-        fail(f"Missing {label}: {p}")
-    return p
+    default_attempts = 8 if is_drive_path(p) else 1
+    total_attempts = int(os.getenv("FIORELLIA_DRIVE_WAIT_ATTEMPTS", attempts or default_attempts))
+    sleep_seconds = float(os.getenv("FIORELLIA_DRIVE_WAIT_BASE_SECONDS", base_sleep or 1.5))
+
+    def ok() -> bool:
+        if kind == "file":
+            return p.is_file()
+        if kind == "dir":
+            return p.is_dir()
+        return p.exists()
+
+    for attempt in range(1, total_attempts + 1):
+        if ok():
+            size = p.stat().st_size if p.is_file() else None
+            suffix = f" size={size}" if size is not None else ""
+            print(f"[Fiorell.IA preflight] OK {label}: {p}{suffix}")
+            return p
+        if attempt < total_attempts:
+            wait = sleep_seconds * attempt
+            print(
+                f"[Fiorell.IA preflight] {label} non ancora visibile: {p} "
+                f"(tentativo {attempt}/{total_attempts}); retry tra {wait:.1f}s"
+            )
+            time.sleep(wait)
+    fail(f"Missing {label} after {total_attempts} attempts: {p}")
+
+
+def require_file(path: str | Path, label: str) -> Path:
+    return wait_for_path(path, label, kind="file")
 
 
 def require_dir(path: str | Path, label: str, create: bool = False) -> Path:
     p = Path(path).expanduser().resolve()
     if create:
         p.mkdir(parents=True, exist_ok=True)
-    if not p.exists() or not p.is_dir():
-        fail(f"Missing {label}: {p}")
-    return p
+    return wait_for_path(p, label, kind="dir")
 
 
 def load_config(config_path: str | Path) -> dict[str, Any]:
@@ -68,7 +106,7 @@ def save_config(config: Mapping[str, Any], config_path: str | Path) -> Path:
     p = Path(config_path).expanduser().resolve()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(yaml.safe_dump(dict(config), sort_keys=False, allow_unicode=True), encoding="utf-8")
-    return p
+    return wait_for_path(p, "YAML config", kind="file")
 
 
 def validate_config(config: Mapping[str, Any], repo_root: str | Path) -> dict[str, Path]:
@@ -81,8 +119,7 @@ def validate_config(config: Mapping[str, Any], repo_root: str | Path) -> dict[st
         fail("target_modules must be a non-empty list")
     root = require_dir(repo_root, "repository root")
     dataset = root / str(config["dataset_path"])
-    if not dataset.exists():
-        fail(f"Dataset from config not found: {dataset}")
+    wait_for_path(dataset, "dataset from config", kind="file")
     output_dir = root / str(config["output_dir"])
     return {"dataset_path": dataset, "output_dir": output_dir}
 
@@ -139,6 +176,7 @@ def zip_adapter(adapter_dir: str | Path, zip_path: str | Path) -> Path:
                 continue
             if item.is_file():
                 zf.write(item, arcname=str(rel))
+    wait_for_path(target, "adapter zip", kind="file")
     return validate_adapter_zip(target)
 
 
@@ -147,14 +185,14 @@ def copy_artifact(src: str | Path, dst: str | Path) -> Path:
     target = Path(dst).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
-    return target
+    return wait_for_path(target, "copied artifact", kind="file")
 
 
 def write_json(data: Mapping[str, Any], path: str | Path) -> Path:
     target = Path(path).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(dict(data), indent=2, ensure_ascii=False, sort_keys=True), encoding="utf-8")
-    return target
+    return wait_for_path(target, "JSON artifact", kind="file")
 
 
 def write_final_verdict(path: str | Path, verdict: str, metrics: Mapping[str, Any]) -> Path:
@@ -166,7 +204,7 @@ def write_final_verdict(path: str | Path, verdict: str, metrics: Mapping[str, An
         "GO solo se tutte le soglie sono rispettate, nessun priority case regredisce e nessun artifact critico manca.",
     ])
     target.write_text(body, encoding="utf-8")
-    return target
+    return wait_for_path(target, "final verdict", kind="file")
 
 
 def read_jsonl(path: str | Path) -> list[dict[str, Any]]:
@@ -193,7 +231,7 @@ def write_jsonl(rows: Iterable[Mapping[str, Any]], path: str | Path) -> Path:
     with p.open("w", encoding="utf-8") as f:
         for row in rows:
             f.write(json.dumps(dict(row), ensure_ascii=False) + "\n")
-    return p
+    return wait_for_path(p, "JSONL artifact", kind="file")
 
 
 def normalize_text(value: Any) -> str:
@@ -468,4 +506,4 @@ def write_csv(rows: list[Mapping[str, Any]], path: str | Path) -> Path:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    return p
+    return wait_for_path(p, "CSV artifact", kind="file")
