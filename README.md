@@ -93,8 +93,9 @@ fiorellia_blitz_perfection.ipynb
 fiorellia_blitz_perfection.py
 ```
 
-La modalità Blitz usa 3 epoche, batch A100 più alto, eval critica ridotta e salva gli
-artefatti in `fiorellia-runs/blitz_delivery_latest/` e `releases/blitz_release_latest/`.
+La modalità Blitz usa 3 epoche, batch A100 più alto, eval critica bilanciata,
+evaluation BF16/SDPA stabile con retry diagnostico, e salva gli artefatti in
+`fiorellia-runs/blitz_delivery_latest/` e `releases/blitz_release_latest/`.
 Il suo esito positivo è `GO CON RISERVA`: per `GO DEFINITIVO` resta necessaria la
 certificazione Gold completa.
 

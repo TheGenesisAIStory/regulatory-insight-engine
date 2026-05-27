@@ -116,7 +116,8 @@ Use `fiorellia_blitz_perfection.ipynb` when the Colab A100 runtime keeps disconn
 - trains only 3 epochs;
 - starts from `per_device_train_batch_size=4` and retries with smaller batches if needed;
 - requests Flash Attention 2 and falls back to SDPA if the runtime cannot load it;
-- evaluates a 10-case critical subset instead of the full release gate;
+- evaluates a balanced 10-case critical subset instead of the full release gate;
+- uses BF16/SDPA evaluation by default and retries evaluation if the first pass returns empty/error-only outputs;
 - writes artifacts to `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/blitz_delivery_latest/`;
 - can open Gradio automatically after a positive relaxed gate.
 

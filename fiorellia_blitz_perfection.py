@@ -208,26 +208,35 @@ def select_blitz_eval(eval_set: Path, output_path: Path, max_cases: int) -> list
     selected: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    def add(row: dict[str, Any]) -> None:
+    def add(row: dict[str, Any]) -> bool:
         case_id = str(row.get("id") or "")
         if case_id and case_id not in seen and len(selected) < max_cases:
             selected.append(row)
             seen.add(case_id)
+            return True
+        return False
 
-    for row in rows:
-        if category(row) == "in_scope_grounded":
-            add(row)
-    for row in rows:
-        if str(row.get("id") or "").rsplit("-", 1)[-1] in PRIORITY_SUFFIXES:
-            add(row)
-    for wanted in ["unsupported_abstention", "out_of_scope_refusal"]:
+    quota = {
+        "in_scope_grounded": min(4, max_cases),
+        "unsupported_abstention": min(4, max(0, max_cases - 4)),
+        "out_of_scope_refusal": max(0, max_cases - 8),
+    }
+    for wanted, limit in quota.items():
+        added = 0
+        priority_first = sorted(
+            [row for row in rows if category(row) == wanted],
+            key=lambda row: str(row.get("id") or "").rsplit("-", 1)[-1] not in PRIORITY_SUFFIXES,
+        )
+        for row in priority_first:
+            if added >= limit:
+                break
+            if add(row):
+                added += 1
+
+    for suffix in PRIORITY_SUFFIXES:
         for row in rows:
-            if category(row) == wanted:
+            if str(row.get("id") or "").rsplit("-", 1)[-1] == suffix:
                 add(row)
-                if len(selected) >= max_cases:
-                    break
-        if len(selected) >= max_cases:
-            break
     for row in rows:
         add(row)
     write_jsonl(selected, output_path)
@@ -296,52 +305,121 @@ def run_training_blitz(
     raise RuntimeError(f"BLOCCANTE: Blitz training failed after retries: {attempts}")
 
 
+def output_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    errors = [row for row in rows if row.get("error")]
+    empty = [row for row in rows if not str(row.get("model_answer") or "").strip()]
+    previews = [
+        {
+            "id": row.get("id"),
+            "category": row.get("category"),
+            "error": row.get("error"),
+            "answer_preview": str(row.get("model_answer") or "")[:240],
+        }
+        for row in rows[:5]
+    ]
+    return {
+        "rows": len(rows),
+        "error_count": len(errors),
+        "empty_answer_count": len(empty),
+        "all_empty": bool(rows) and len(empty) == len(rows),
+        "all_error": bool(rows) and len(errors) == len(rows),
+        "previews": previews,
+    }
+
+
+def run_adapter_eval(
+    adapter_dir: Path,
+    eval_subset: Path,
+    output_path: Path,
+    max_new_tokens: int,
+    use_flash_attention: bool,
+    use_4bit: bool,
+) -> list[dict[str, Any]]:
+    command = [
+        sys.executable,
+        str(ROOT / "fiorellia" / "eval" / "prompt_harness_local_adapter.py"),
+        "--dataset",
+        str(eval_subset),
+        "--system-prompt",
+        str(SYSTEM_PROMPT),
+        "--adapter-path",
+        str(adapter_dir),
+        "--base-model",
+        "Qwen/Qwen2.5-3B-Instruct",
+        "--out",
+        str(output_path),
+        "--max-new-tokens",
+        str(max_new_tokens),
+        "--attn-implementation",
+        "flash_attention_2" if use_flash_attention else "sdpa",
+    ]
+    if use_4bit:
+        command.append("--use-4bit")
+    run(command)
+    return read_jsonl(output_path)
+
+
+def score_adapter_eval(adapter_rows: list[dict[str, Any]]) -> tuple[dict[str, float], list[dict[str, Any]], dict[str, Any]]:
+    strict_scored, strict_metrics = score_eval_rows(adapter_rows)
+    scored_rows, raw_metrics, diagnostics = tolerant_rescore_rows(strict_scored)
+    metrics = {name: float(raw_metrics.get(name) or 0.0) for name in BLITZ_THRESHOLDS}
+    diagnostics = {**diagnostics, "output_diagnostics": output_diagnostics(adapter_rows)}
+    return metrics, scored_rows, {"strict_metrics": strict_metrics, "diagnostics": diagnostics}
+
+
+def should_retry_eval(metrics: Mapping[str, float], diagnostics: Mapping[str, Any]) -> bool:
+    output = diagnostics.get("output_diagnostics") if isinstance(diagnostics, Mapping) else None
+    if isinstance(output, Mapping) and (output.get("all_empty") or output.get("all_error")):
+        return True
+    return all(float(metrics.get(name, 0.0)) == 0.0 for name in BLITZ_THRESHOLDS)
+
+
 def evaluate_blitz(
     adapter_dir: Path,
     eval_subset: Path,
     artifact_dir: Path,
     max_new_tokens: int,
     use_flash_attention: bool,
+    eval_4bit: bool,
 ) -> tuple[dict[str, float], list[dict[str, Any]], dict[str, Any]]:
-    adapter_eval = artifact_dir / "reports" / "adapter_eval.jsonl"
-    run(
-        [
-            sys.executable,
-            str(ROOT / "fiorellia" / "eval" / "prompt_harness_local_adapter.py"),
-            "--dataset",
-            str(eval_subset),
-            "--system-prompt",
-            str(SYSTEM_PROMPT),
-            "--adapter-path",
-            str(adapter_dir),
-            "--base-model",
-            "Qwen/Qwen2.5-3B-Instruct",
-            "--out",
-            str(adapter_eval),
-            "--max-new-tokens",
-            str(max_new_tokens),
-            "--use-4bit",
-            "--attn-implementation",
-            "flash_attention_2" if use_flash_attention else "sdpa",
-        ]
+    reports_dir = artifact_dir / "reports"
+    adapter_eval = reports_dir / "adapter_eval.jsonl"
+    attempts = []
+    adapter_rows = run_adapter_eval(
+        adapter_dir=adapter_dir,
+        eval_subset=eval_subset,
+        output_path=adapter_eval,
+        max_new_tokens=max_new_tokens,
+        use_flash_attention=use_flash_attention,
+        use_4bit=eval_4bit,
     )
-    adapter_rows = read_jsonl(adapter_eval)
-    strict_scored, strict_metrics = score_eval_rows(adapter_rows)
-    scored_rows, raw_metrics, diagnostics = tolerant_rescore_rows(strict_scored)
-    metrics = {name: float(raw_metrics.get(name) or 0.0) for name in BLITZ_THRESHOLDS}
+    metrics, scored_rows, eval_info = score_adapter_eval(adapter_rows)
+    attempts.append({"path": str(adapter_eval), "eval_4bit": eval_4bit, "flash_attention": use_flash_attention, **eval_info})
+    if should_retry_eval(metrics, eval_info["diagnostics"]):
+        retry_eval = reports_dir / "adapter_eval_bf16_sdpa_retry.jsonl"
+        adapter_rows = run_adapter_eval(
+            adapter_dir=adapter_dir,
+            eval_subset=eval_subset,
+            output_path=retry_eval,
+            max_new_tokens=max_new_tokens,
+            use_flash_attention=False,
+            use_4bit=False,
+        )
+        metrics, scored_rows, eval_info = score_adapter_eval(adapter_rows)
+        adapter_eval = retry_eval
+        attempts.append({"path": str(retry_eval), "eval_4bit": False, "flash_attention": False, **eval_info})
     write_jsonl(scored_rows, artifact_dir / "adapter_eval_scored.jsonl")
     write_json(metrics, artifact_dir / "metrics_summary.json")
     write_json(
         {
-            "strict_metrics": strict_metrics,
-            "raw_metrics": raw_metrics,
+            "attempts": attempts,
             "blitz_thresholds": BLITZ_THRESHOLDS,
             "full_release_thresholds": FINAL_THRESHOLDS,
-            "diagnostics": diagnostics,
+            "selected_attempt": attempts[-1],
         },
         artifact_dir / "eval_diagnostics.json",
     )
-    return metrics, scored_rows, {"adapter_eval": str(adapter_eval), "strict_metrics": strict_metrics, "diagnostics": diagnostics}
+    return metrics, scored_rows, {"adapter_eval": str(adapter_eval), "attempts": attempts, **eval_info}
 
 
 def launch_gradio(adapter_dir: Path, artifact_dir: Path, max_new_tokens: int) -> int:
@@ -375,6 +453,7 @@ def main() -> int:
     parser.add_argument("--install-deps", action="store_true")
     parser.add_argument("--try-flash-attn-install", action="store_true")
     parser.add_argument("--no-flash-attn", action="store_true")
+    parser.add_argument("--eval-4bit", action="store_true")
     parser.add_argument("--no-require-a100", action="store_true")
     parser.add_argument("--skip-app-tests", action="store_true")
     parser.add_argument("--launch-gradio", action="store_true")
@@ -445,6 +524,7 @@ def main() -> int:
         artifact_dir=artifact_dir,
         max_new_tokens=args.max_new_tokens,
         use_flash_attention=not args.no_flash_attn,
+        eval_4bit=args.eval_4bit,
     )
     adapter_rows = read_jsonl(Path(eval_info["adapter_eval"]))
     write_comparison(eval_rows, adapter_rows, artifact_dir / "comparison.csv")
