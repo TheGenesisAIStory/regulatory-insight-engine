@@ -4,15 +4,28 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
 from fiorellia_app import DEFAULT_ADAPTER, DEFAULT_HISTORY, SMOKE_CASES, answer_query, choose_client
 
 
+def preload_client(client: Any) -> None:
+    preload = getattr(client, "preload", None)
+    if callable(preload):
+        started = time.time()
+        print("Preloading Fiorell.IA model before opening Gradio...")
+        preload()
+        print(f"Fiorell.IA model preload completed in {time.time() - started:.1f}s")
+    else:
+        print("Safe fallback client active; no model preload needed.")
+
+
 def run_final_tests(adapter_path: Path, history_path: Path, output_path: Path) -> int:
     os.environ["FIORELLIA_SMOKE_LOAD_MODEL"] = "1"
     client = choose_client(adapter_path)
+    preload_client(client)
     results: list[dict[str, Any]] = []
     for case in SMOKE_CASES:
         answer, score, no_answer, meta = answer_query(case["query"], client, history_path, case.get("retrieved_context", ""))
@@ -45,6 +58,8 @@ def launch(adapter_path: Path, history_path: Path, host: str, port: int, share: 
     from fiorellia_app import answer_query, export_history
 
     client = choose_client(adapter_path)
+    if os.getenv("FIORELLIA_PRELOAD_MODEL", "1") != "0":
+        preload_client(client)
     with gr.Blocks(title="Fiorell.IA Final Release") as demo:
         gr.Markdown("# Fiorell.IA")
         query = gr.Textbox(label="Query normativa", lines=5)
@@ -72,9 +87,15 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("app_final_test_results.json"))
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=7860)
+    parser.add_argument("--max-new-tokens", type=int, default=None)
+    parser.add_argument("--no-preload", action="store_true")
     parser.add_argument("--share", action="store_true")
     parser.add_argument("--final-tests", action="store_true")
     args = parser.parse_args()
+    if args.max_new_tokens is not None:
+        os.environ["FIORELLIA_MAX_NEW_TOKENS"] = str(args.max_new_tokens)
+    if args.no_preload:
+        os.environ["FIORELLIA_PRELOAD_MODEL"] = "0"
     if args.final_tests:
         return run_final_tests(args.adapter_path, args.history, args.output)
     return launch(args.adapter_path, args.history, args.host, args.port, args.share)

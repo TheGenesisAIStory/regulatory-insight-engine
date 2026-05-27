@@ -110,7 +110,7 @@ ensure_file("fiorellia/training/supervised_v2_behavior_hardening_20260526.jsonl"
 ensure_file("fiorellia/prompts/system_prompt_strict.md", "Regole vincolanti")
 ensure_file("fiorellia/prompts/system_prompt_short.md", "Formato:")
 ensure_file("fiorellia/eval/eval_set_behavior_hardening_v1.jsonl", "fio-v1-001")
-ensure_file("fiorellia_app_colab.py", "Fiorell.IA Colab Gradio launcher")
+ensure_file("fiorellia_app_colab.py", "Preloading Fiorell.IA model before opening Gradio")
 ensure_file("fiorellia_app.py", "Model loaded on:")
 ensure_aliases()
 

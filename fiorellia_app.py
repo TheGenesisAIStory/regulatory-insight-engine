@@ -14,6 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 DEFAULT_ADAPTER = ROOT / "fiorellia" / "training" / "lora" / "fiorellia_behavior_RC_HARDENED_20260526"
 DEFAULT_HISTORY = ROOT / "fiorellia_app_history.jsonl"
+DEFAULT_MAX_NEW_TOKENS = int(os.getenv("FIORELLIA_MAX_NEW_TOKENS", "96"))
 
 SYSTEM_PROMPT = next(
     path
@@ -89,6 +90,7 @@ class LocalLoraClient:
         from peft import PeftModel
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
+        started = time.time()
         adapter_config = load_json(self.adapter_path / "adapter_config.json")
         base_model = adapter_config.get("base_model_name_or_path", "Qwen/Qwen2.5-3B-Instruct")
         has_cuda = torch.cuda.is_available()
@@ -135,8 +137,11 @@ class LocalLoraClient:
         print(
             f"Model loaded on: {loaded_device}; input_device={self.device}; "
             f"4bit={self.loaded_with_4bit}; gpu_allocated_gb={gpu_allocated:.2f}; "
-            f"gpu_reserved_gb={gpu_reserved:.2f}"
+            f"gpu_reserved_gb={gpu_reserved:.2f}; load_seconds={time.time() - started:.1f}"
         )
+
+    def preload(self) -> None:
+        self._load()
 
     def _prompt(self, query: str, retrieved_context: str = "") -> str:
         context = retrieved_context.strip() or "[nessun contesto recuperato]"
@@ -168,8 +173,9 @@ class LocalLoraClient:
         with torch.no_grad():
             output = self.model.generate(
                 **inputs,
-                max_new_tokens=220,
+                max_new_tokens=DEFAULT_MAX_NEW_TOKENS,
                 do_sample=False,
+                use_cache=True,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
         answer = self.tokenizer.decode(output[0][prompt_len:], skip_special_tokens=True).strip()
