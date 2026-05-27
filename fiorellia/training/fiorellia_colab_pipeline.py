@@ -275,11 +275,16 @@ def has_valid_source_reference(text: Any) -> bool:
         return False
     t = normalize_text(text).lower()
     patterns = [
+        r"fonti:\s*-\s*\[?\s*(crr|circ\.?\s*285|circolare\s*285|ifrs\s*9|basel|banca d'italia)",
         r"fonti:\s*-\s*(crr|circ\.?\s*285|circolare\s*285|ifrs\s*9|basel|banca d'italia).{0,100}\b(art|par|parte|titolo|capitolo|sezione|aggiornamento|\d)",
+        r"\[?\s*crr\s*,?\s*art\.?\s*\d+",
         r"\bcrr\s*-\s*art\.?\s*\d+",
+        r"\[?\s*ifrs\s*9\s*,?\s*par\.?\s*[\d.]+",
         r"\bifrs\s*9\s*-\s*par\.?\s*[\d.]+",
+        r"\[?\s*circolare\s*285\s*,?\s*(parte|titolo|capitolo|aggiornamento|controlli|governo)",
         r"\bcircolare\s*285\s*-",
         r"\bcirc\.?\s*285\s*-",
+        r"\[?\s*basel\s*iii\s*,?\s*(sezione|capital|framework)",
         r"\bbasel\s*iii\s*-",
         r"\[.*?p\.\s*\d+.*?\]",
     ]

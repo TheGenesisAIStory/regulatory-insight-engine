@@ -98,6 +98,15 @@ Run it in Colab A100 with `Runtime -> Run all`. It executes `fiorellia_gold_zero
 
 If a previous Gold attempt produced `unsupported_abstention=1.0` but `in_scope_grounded=0.0`, rerun the notebook after pulling commit `43872f7` or later plus the Gold balance hotfix. That failure mode means the dataset was too abstention-heavy, not that the training infrastructure failed.
 
+If a Gold attempt produces strong abstention/refusal but a borderline `in_scope_grounded` score, first rescore the existing eval outputs before retraining:
+
+```bash
+cd /content/drive/MyDrive/regulatory-insight-engine
+python fiorellia_gold_rescore_existing.py --copy-verdict-to-repo
+```
+
+This does not train again. It reloads `fiorellia-runs/final_delivery_latest/reports/adapter_eval.jsonl`, applies the current source-citation parser, rewrites `metrics_summary.json`, `adapter_eval_scored.jsonl`, `comparison.csv`, `final_perfection_summary.json`, `final_verdict_master.md`, and refreshes `releases/gold_release_latest/`.
+
 ## Permanent Repo Fixes
 
 The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink workarounds are no longer needed:

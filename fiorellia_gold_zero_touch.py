@@ -88,9 +88,10 @@ def refresh_critical_files() -> None:
     critical_files = {
         "fiorellia_colab_drive_bootstrap.py": "drive_first_bootstrap",
         "final_perfection_run.py": "balance_gold_boundaries",
+        "fiorellia_gold_rescore_existing.py": "Rescore an existing Fiorell.IA Gold eval",
         "fiorellia_gold_zero_touch.py": "GOLD_RELEASE",
         "fiorellia/training/train_lora_behavior_v1.py": "weight_decay",
-        "fiorellia/training/fiorellia_colab_pipeline.py": "documentazione statica",
+        "fiorellia/training/fiorellia_colab_pipeline.py": "crr\\s*,?\\s*art",
         "fiorellia/training/final_colab_certification.py": "Drive already available",
         "fiorellia/eval/prompt_harness_local_adapter.py": "Contesto locale recuperato",
         "fiorellia/prompts/system_prompt_strict.md": "Regole vincolanti",
