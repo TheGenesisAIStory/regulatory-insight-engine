@@ -75,7 +75,8 @@ fiorellia/prompts/system_prompt_strict.md
 fiorellia/eval/eval_set_behavior_hardening_v1.jsonl
 ```
 
-Recovery finale per analisi fallimenti, pulizia dataset, 20 esempi di astensione estrema e retraining conservativo:
+Recovery finale per analisi fallimenti, pulizia dataset, 20 esempi di astensione estrema,
+grounded-recovery examples nel formato del prompt harness e retraining conservativo:
 
 ```text
 final_perfection_run.py

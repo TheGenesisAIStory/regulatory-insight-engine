@@ -89,7 +89,8 @@ Run it in Colab A100 with `Runtime -> Run all`. It executes `fiorellia_gold_zero
 - verifies `nvidia-smi`, `torch.cuda.is_available()` and A100;
 - runs `final_perfection_run.py --gold-release`;
 - triplicates unsupported-abstention training examples when the clean source set has fewer than 50;
-- balances the Gold training set after abstention triplication with at least 72 grounded examples and 40 out-of-scope examples, so the model does not collapse into always abstaining;
+- injects targeted grounded-recovery examples in the exact prompt-harness format;
+- balances the Gold training set after abstention triplication with at least 96 grounded examples and 40 out-of-scope examples, so the model does not collapse into always abstaining;
 - trains with `num_train_epochs=10`, `learning_rate=3e-5`, `gradient_accumulation_steps=4`;
 - retries once with a smaller memory profile if training fails;
 - writes `loss_report.md` and `loss_curve.csv`;

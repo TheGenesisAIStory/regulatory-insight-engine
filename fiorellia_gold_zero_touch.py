@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -87,9 +88,9 @@ def ensure_repo_root() -> None:
 def refresh_critical_files() -> None:
     critical_files = {
         "fiorellia_colab_drive_bootstrap.py": "drive_first_bootstrap",
-        "final_perfection_run.py": "balance_gold_boundaries",
+        "final_perfection_run.py": "grounded_recovery_cases",
         "fiorellia_gold_rescore_existing.py": "Rescore an existing Fiorell.IA Gold eval",
-        "fiorellia_gold_zero_touch.py": "GOLD_RELEASE",
+        "fiorellia_gold_zero_touch.py": "inject-grounded-repairs",
         "fiorellia/training/train_lora_behavior_v1.py": "weight_decay",
         "fiorellia/training/fiorellia_colab_pipeline.py": "crr\\s*,?\\s*art",
         "fiorellia/training/final_colab_certification.py": "Drive already available",
@@ -197,8 +198,9 @@ def run_gold_certification() -> dict[str, Any]:
         "--weight-decay",
         "0.05",
         "--balance-gold-boundaries",
+        "--inject-grounded-repairs",
         "--min-grounded-count",
-        "72",
+        "96",
         "--min-out-of-scope-count",
         "40",
     ]
@@ -227,6 +229,12 @@ def launch_gold_demo(summary: dict[str, Any]) -> None:
     adapter_dir = Path(summary.get("adapter_dir") or f"/content/{FINAL_NAME}")
     history_path = ARTIFACT_DIR / "gold_demo_history.jsonl"
     client = choose_client(adapter_dir)
+    preload = getattr(client, "preload", None)
+    if callable(preload):
+        started = time.time()
+        print("Preloading Fiorell.IA model before opening Gold Gradio demo...")
+        preload()
+        print(f"Fiorell.IA Gold model preload completed in {time.time() - started:.1f}s")
 
     examples = {
         "Normativa": (

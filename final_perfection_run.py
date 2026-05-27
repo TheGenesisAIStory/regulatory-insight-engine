@@ -342,6 +342,84 @@ def make_extreme_row(system_prompt: str, index: int, query: str) -> dict[str, An
     }
 
 
+def harness_user_content(context: str, query: str) -> str:
+    return "\n\n".join(
+        [
+            "Contesto locale recuperato:",
+            context.strip(),
+            "Domanda utente:",
+            query.strip(),
+            "Rispondi secondo le regole Fiorell.IA. Se mancano fonti locali recuperate, astieniti.",
+        ]
+    )
+
+
+def grounded_recovery_cases() -> list[dict[str, str]]:
+    return [
+        {
+            "id": "fio-v3-grounded-repair-001",
+            "query": "Quali sono i principali requisiti sui fondi propri nel CRR?",
+            "context": "[CRR, art. 92] Le istituzioni rispettano requisiti di fondi propri espressi come coefficienti di capitale rispetto all'esposizione complessiva al rischio.",
+            "answer": "Risposta:\nIl passaggio recuperato consente di affermare che i requisiti sui fondi propri sono espressi come coefficienti di capitale rispetto all'esposizione complessiva al rischio. Non supporta una ricostruzione completa del regime patrimoniale CRR.\n\nFonti:\n- CRR - art. 92\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-002",
+            "query": "Come viene trattato il concetto di default nel corpus regolamentare indicizzato?",
+            "context": "[CRR, art. 4] Il default e richiamato nel contesto delle esposizioni e del rischio di credito.",
+            "answer": "Risposta:\nNel passaggio recuperato il default e trattato come nozione collegata alle esposizioni e al rischio di credito. La fonte non consente di estendere la risposta a definizioni ulteriori non recuperate.\n\nFonti:\n- CRR - art. 4\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-003",
+            "query": "Quali elementi di vigilanza prudenziale emergono dai documenti locali di Banca d'Italia?",
+            "context": "[Circolare 285, Parte Prima, Titolo I] Le disposizioni di vigilanza prudenziale perseguono la sana e prudente gestione degli intermediari.",
+            "answer": "Risposta:\nDal passaggio recuperato emerge che le disposizioni di vigilanza prudenziale perseguono la sana e prudente gestione degli intermediari. La risposta deve restare limitata a questa finalita indicata dalla fonte.\n\nFonti:\n- Circolare 285 - Parte Prima, Titolo I\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-004",
+            "query": "Cosa posso dire sui controlli interni se il contesto recuperato cita disposizioni di vigilanza?",
+            "context": "[Circolare 285, Parte Prima, Titolo IV, Capitolo 3] Il sistema dei controlli interni deve assicurare il contenimento dei rischi entro i limiti indicati nel quadro di riferimento per la propensione al rischio.",
+            "answer": "Risposta:\nIl contesto consente di dire che il sistema dei controlli interni deve contribuire al contenimento dei rischi entro i limiti definiti dal quadro di riferimento per la propensione al rischio. Non consente di aggiungere compiti o presidi non citati.\n\nFonti:\n- Circolare 285 - Parte Prima, Titolo IV, Capitolo 3\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-005",
+            "query": "Spiega in modo sintetico la relazione tra fondi propri e vigilanza prudenziale usando solo le fonti locali.",
+            "context": "[CRR, art. 92] I requisiti di fondi propri sono espressi rispetto all'esposizione complessiva al rischio. [Circolare 285, Parte Prima, Titolo I] La vigilanza prudenziale persegue la sana e prudente gestione.",
+            "answer": "Risposta:\nLe fonti recuperate consentono una relazione ristretta: il CRR collega i requisiti di fondi propri all'esposizione complessiva al rischio, mentre la Circolare 285 richiama la sana e prudente gestione come finalita della vigilanza prudenziale. Non risultano supportati ulteriori dettagli quantitativi o applicativi.\n\nFonti:\n- CRR - art. 92\n- Circolare 285 - Parte Prima, Titolo I\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-006",
+            "query": "Quale indicazione generale sui fondi propri emerge dal passaggio CRR recuperato?",
+            "context": "[CRR, art. 92] Le istituzioni rispettano requisiti di fondi propri espressi come coefficienti di capitale rispetto all'esposizione complessiva al rischio.",
+            "answer": "Risposta:\nIl passaggio indica che i requisiti sui fondi propri sono formulati come coefficienti di capitale rapportati all'esposizione complessiva al rischio.\n\nFonti:\n- CRR - art. 92\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-007",
+            "query": "Quale ruolo emerge per le funzioni di controllo?",
+            "context": "[Circolare 285, controlli interni] Le funzioni aziendali di controllo concorrono alla gestione e al presidio dei rischi.",
+            "answer": "Risposta:\nIl passaggio recuperato attribuisce alle funzioni aziendali di controllo un ruolo di concorso nella gestione e nel presidio dei rischi. Non sono supportati ulteriori dettagli organizzativi.\n\nFonti:\n- Circolare 285 - controlli interni\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+        {
+            "id": "fio-v3-grounded-repair-008",
+            "query": "Che cosa si puo dire sul CET1 dal passaggio?",
+            "context": "[CRR, art. 26] Gli elementi del capitale primario di classe 1 sono individuati secondo condizioni specifiche previste dal regolamento.",
+            "answer": "Risposta:\nDal passaggio si puo affermare che gli elementi del capitale primario di classe 1 sono individuati secondo condizioni specifiche previste dal CRR. La fonte recuperata non consente l'elenco completo di tali condizioni.\n\nFonti:\n- CRR - art. 26\n\nNota:\nRisposta limitata ai documenti indicizzati nel corpus locale.",
+        },
+    ]
+
+
+def make_grounded_repair_row(system_prompt: str, case: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "id": case["id"],
+        "category": "in_scope_grounded",
+        "lang": "it",
+        "messages": [
+            {"role": "system", "content": system_prompt.strip()},
+            {"role": "user", "content": harness_user_content(case["context"], case["query"])},
+            {"role": "assistant", "content": case["answer"].strip()},
+        ],
+    }
+
+
 def is_unsupported_train_row(row: Mapping[str, Any]) -> bool:
     category = str(row.get("category") or "").lower().replace("-", "_")
     return "unsupported" in category or "abstention" in category or "no_context" in category
@@ -419,6 +497,7 @@ def build_clean_augmented_dataset(
     balance_gold_boundaries: bool = False,
     min_grounded_count: int = 64,
     min_out_of_scope_count: int = 36,
+    inject_grounded_repairs: bool = False,
 ) -> dict[str, Any]:
     system_prompt = system_prompt_path.read_text(encoding="utf-8")
     rows = [replace_system_prompt(row, system_prompt) for row in read_jsonl(source_dataset)]
@@ -439,14 +518,23 @@ def build_clean_augmented_dataset(
             kept,
             min_abstention_for_triplicate=min_abstention_for_triplicate,
         )
-    existing_ids = {str(row.get("id")) for row in kept}
+    existing_ids = {str(row.get("id")) for row in kept_after_triplicate}
     additions = []
     for index, query in enumerate(extreme_queries(), start=1):
         row = make_extreme_row(system_prompt, index, query)
         if row["id"] in existing_ids:
             raise RuntimeError(f"Duplicate generated id: {row['id']}")
+        existing_ids.add(row["id"])
         additions.append(row)
-    final_rows = kept_after_triplicate + additions
+    grounded_repair_rows: list[dict[str, Any]] = []
+    if inject_grounded_repairs:
+        for case in grounded_recovery_cases():
+            row = make_grounded_repair_row(system_prompt, case)
+            if row["id"] in existing_ids:
+                raise RuntimeError(f"Duplicate generated id: {row['id']}")
+            existing_ids.add(row["id"])
+            grounded_repair_rows.append(row)
+    final_rows = kept_after_triplicate + additions + grounded_repair_rows
     grounded_balance_rows: list[dict[str, Any]] = []
     out_of_scope_balance_rows: list[dict[str, Any]] = []
     if balance_gold_boundaries:
@@ -471,6 +559,7 @@ def build_clean_augmented_dataset(
         "rows_removed_failure_matches": len(removed),
         "rows_triplicated_abstention_added": len(triplicated_rows),
         "rows_extreme_abstention_added": len(additions),
+        "rows_grounded_repair_added": len(grounded_repair_rows),
         "rows_grounded_balance_added": len(grounded_balance_rows),
         "rows_out_of_scope_balance_added": len(out_of_scope_balance_rows),
         "rows_final": len(final_rows),
@@ -479,6 +568,7 @@ def build_clean_augmented_dataset(
         "triplicate_low_abstention": triplicate_low_abstention,
         "min_abstention_for_triplicate": min_abstention_for_triplicate,
         "balance_gold_boundaries": balance_gold_boundaries,
+        "inject_grounded_repairs": inject_grounded_repairs,
         "min_grounded_count": min_grounded_count,
         "min_out_of_scope_count": min_out_of_scope_count,
         "extreme_abstention_answer": EXTREME_ABSTENTION_ANSWER,
@@ -495,6 +585,7 @@ def write_dataset_card(path: Path, summary: Mapping[str, Any]) -> None:
         f"- Removed failure-matched rows: `{summary['rows_removed_failure_matches']}`",
         f"- Added triplicated abstention rows: `{summary.get('rows_triplicated_abstention_added', 0)}`",
         f"- Added extreme abstention rows: `{summary['rows_extreme_abstention_added']}`",
+        f"- Added grounded repair rows: `{summary.get('rows_grounded_repair_added', 0)}`",
         f"- Added grounded balance rows: `{summary.get('rows_grounded_balance_added', 0)}`",
         f"- Added out-of-scope balance rows: `{summary.get('rows_out_of_scope_balance_added', 0)}`",
         f"- Final rows: `{summary['rows_final']}`",
@@ -885,6 +976,7 @@ def main() -> int:
     parser.add_argument("--triplicate-low-abstention", action="store_true")
     parser.add_argument("--min-abstention-for-triplicate", type=int, default=50)
     parser.add_argument("--balance-gold-boundaries", action="store_true")
+    parser.add_argument("--inject-grounded-repairs", action="store_true")
     parser.add_argument("--min-grounded-count", type=int, default=64)
     parser.add_argument("--min-out-of-scope-count", type=int, default=36)
     parser.add_argument("--learning-rate", type=float, default=None)
@@ -913,6 +1005,7 @@ def main() -> int:
     weight_decay = args.weight_decay if args.weight_decay is not None else 0.05
     triplicate_low_abstention = args.triplicate_low_abstention or args.gold_release
     balance_gold_boundaries = args.balance_gold_boundaries or args.gold_release
+    inject_grounded_repairs = args.inject_grounded_repairs or args.gold_release
 
     scored_path = find_scored_jsonl(artifact_dir, args.scored_jsonl)
     scored_rows, previous_metrics, scored_status = load_or_score_eval(scored_path)
@@ -937,6 +1030,7 @@ def main() -> int:
         balance_gold_boundaries=balance_gold_boundaries,
         min_grounded_count=args.min_grounded_count,
         min_out_of_scope_count=args.min_out_of_scope_count,
+        inject_grounded_repairs=inject_grounded_repairs,
     )
     config = write_final_config(
         args.base_config,
