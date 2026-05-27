@@ -103,6 +103,81 @@ def run(command: list[str], cwd: Path = ROOT, check: bool = True) -> subprocess.
     return subprocess.run(command, cwd=cwd, check=check, text=True)
 
 
+def read_jsonl_with_diagnostics(
+    path: Path,
+    diagnostics_path: Path,
+    expected_rows: int | None = None,
+) -> list[dict[str, Any]]:
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    rows: list[dict[str, Any]] = []
+    bad_lines: list[dict[str, Any]] = []
+    blank_lines = 0
+
+    for line_no, line in enumerate(raw.splitlines(), start=1):
+        cleaned = line.strip().lstrip("\ufeff").strip("\x00").strip()
+        if not cleaned:
+            blank_lines += 1
+            continue
+        json_start = cleaned.find("{")
+        if json_start > 0:
+            bad_lines.append(
+                {
+                    "line": line_no,
+                    "issue": "non_json_prefix_removed",
+                    "prefix_preview": cleaned[:json_start][:300],
+                }
+            )
+            cleaned = cleaned[json_start:]
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            bad_lines.append(
+                {
+                    "line": line_no,
+                    "issue": "json_decode_error",
+                    "error": str(exc),
+                    "preview": cleaned[:500],
+                }
+            )
+            continue
+        if isinstance(parsed, dict):
+            rows.append(parsed)
+        else:
+            bad_lines.append(
+                {
+                    "line": line_no,
+                    "issue": "json_value_is_not_object",
+                    "type": type(parsed).__name__,
+                    "preview": repr(parsed)[:500],
+                }
+            )
+
+    diagnostics = {
+        "path": str(path),
+        "exists": path.exists(),
+        "bytes": path.stat().st_size if path.exists() else 0,
+        "rows_read": len(rows),
+        "expected_rows": expected_rows,
+        "blank_lines": blank_lines,
+        "bad_line_count": len(bad_lines),
+        "bad_lines": bad_lines[:30],
+        "raw_prefix": raw[:1200] if not rows else None,
+    }
+    diagnostics_path.parent.mkdir(parents=True, exist_ok=True)
+    diagnostics_path.write_text(json.dumps(diagnostics, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    if not rows:
+        raise RuntimeError(
+            f"BLOCCANTE: nessuna riga JSON valida in {path}; diagnostics={diagnostics_path}"
+        )
+    if expected_rows is not None and len(rows) < expected_rows:
+        raise RuntimeError(
+            f"BLOCCANTE: adapter eval incompleto: {len(rows)}/{expected_rows} righe valide; "
+            f"diagnostics={diagnostics_path}"
+        )
+    return rows
+
+
 def install_blitz_deps(try_flash_attn: bool) -> dict[str, Any]:
     optional_install_deps()
     flash = {"requested": try_flash_attn, "installed": False, "error": None}
@@ -425,13 +500,18 @@ def run_adapter_eval(
             f"returncode={completed.returncode}; log={log_path}; command={' '.join(str(part) for part in command)}"
         )
     try:
-        rows = read_jsonl(local_output_path)
+        expected_rows = len(read_jsonl(eval_subset))
+    except Exception:
+        expected_rows = None
+    diagnostics_path = output_path.with_suffix(output_path.suffix + ".parse_diagnostics.json")
+    try:
+        rows = read_jsonl_with_diagnostics(local_output_path, diagnostics_path, expected_rows=expected_rows)
     except Exception as exc:
         preview_path = output_path.with_suffix(output_path.suffix + ".invalid_preview.txt")
         preview_path.write_text(local_output_path.read_text(encoding="utf-8", errors="replace")[:8000], encoding="utf-8")
         raise RuntimeError(
             f"BLOCCANTE: adapter eval JSONL non leggibile: {local_output_path}; "
-            f"preview={preview_path}; error={exc}"
+            f"preview={preview_path}; diagnostics={diagnostics_path}; error={exc}"
         ) from exc
     if local_output_path != output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
