@@ -458,6 +458,7 @@ def main() -> int:
     parser.add_argument("--skip-app-tests", action="store_true")
     parser.add_argument("--launch-gradio", action="store_true")
     parser.add_argument("--copy-verdict-to-repo", action="store_true")
+    parser.add_argument("--reuse-existing-adapter", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -505,17 +506,27 @@ def main() -> int:
         write_json(preflight, artifact_dir / "blitz_preflight.json")
         print(json.dumps(preflight, indent=2, ensure_ascii=False))
         return 0
-    training = run_training_blitz(
-        dataset_path=GOLD_DATASET,
-        config_path=config_path,
-        adapter_dir=adapter_dir,
-        artifact_dir=artifact_dir,
-        final_name=args.final_name,
-        epochs=args.epochs,
-        learning_rate=args.learning_rate,
-        initial_batch_size=args.batch_size,
-        use_flash_attention=not args.no_flash_attn,
-    )
+    if args.reuse_existing_adapter:
+        validate_adapter_dir(adapter_dir)
+        training = {
+            "ok": True,
+            "reused_existing_adapter": True,
+            "adapter_dir": str(adapter_dir),
+            "note": "Training skipped by --reuse-existing-adapter; running stabilized Blitz evaluation only.",
+        }
+        write_json(training, artifact_dir / "blitz_training_attempts.json")
+    else:
+        training = run_training_blitz(
+            dataset_path=GOLD_DATASET,
+            config_path=config_path,
+            adapter_dir=adapter_dir,
+            artifact_dir=artifact_dir,
+            final_name=args.final_name,
+            epochs=args.epochs,
+            learning_rate=args.learning_rate,
+            initial_batch_size=args.batch_size,
+            use_flash_attention=not args.no_flash_attn,
+        )
     validate_adapter_dir(adapter_dir)
     zip_adapter(adapter_dir, adapter_zip)
     metrics, scored_rows, eval_info = evaluate_blitz(
