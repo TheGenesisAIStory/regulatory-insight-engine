@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import traceback
 import zipfile
 from collections import Counter
 from datetime import datetime, timezone
@@ -48,7 +49,7 @@ from fiorellia.training.fiorellia_colab_pipeline import (  # noqa: E402
 )
 
 FINAL_NAME = "fiorellia_behavior_BLITZ_RELEASE_20260527"
-BLITZ_SCRIPT_VERSION = "20260527-jsonl-hardening-v2"
+BLITZ_SCRIPT_VERSION = "20260527-local-first-v3"
 SOURCE_DATASET = ROOT / "fiorellia" / "training" / "supervised_v2_behavior_hardening_20260526.jsonl"
 GOLD_DATASET = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.jsonl"
 GOLD_CARD = ROOT / "fiorellia" / "training" / "supervised_gold_release_20260527.md"
@@ -97,6 +98,14 @@ def default_release_dir() -> Path:
     if drive_repo is not None:
         return drive_repo / "releases" / "blitz_release_latest"
     return ROOT / "releases" / "blitz_release_latest"
+
+
+def local_first_artifact_dir() -> Path:
+    return Path("/content/fiorellia-runs/blitz_delivery_latest")
+
+
+def local_first_release_dir() -> Path:
+    return Path("/content/releases/blitz_release_latest")
 
 
 def run(command: list[str], cwd: Path = ROOT, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -419,6 +428,39 @@ def restore_adapter_from_zip(adapter_dir: Path, candidates: list[Path]) -> dict[
     )
 
 
+def drive_blitz_zip_candidates(final_name: str) -> list[Path]:
+    drive_repo = drive_repo_root()
+    if drive_repo is None:
+        return []
+    return [
+        drive_repo / "fiorellia-runs" / "blitz_delivery_latest" / f"{final_name}.zip",
+        drive_repo / "releases" / "blitz_release_latest" / f"{final_name}.zip",
+        drive_repo / "fiorellia-runs" / "final_delivery_latest" / f"{final_name}.zip",
+        drive_repo / "releases" / "gold_release_latest" / f"{final_name}.zip",
+    ]
+
+
+def sync_tree(source: Path, target: Path) -> dict[str, Any]:
+    if source.resolve() == target.resolve():
+        return {"source": str(source), "target": str(target), "skipped": True, "reason": "same_path"}
+    if not source.exists():
+        return {"source": str(source), "target": str(target), "skipped": True, "reason": "source_missing"}
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    return {"source": str(source), "target": str(target), "skipped": False}
+
+
+def sync_local_outputs_to_drive(artifact_dir: Path, release_dir: Path) -> dict[str, Any]:
+    drive_repo = drive_repo_root()
+    if drive_repo is None:
+        return {"ok": False, "reason": "drive_repo_not_found"}
+    return {
+        "ok": True,
+        "artifact_sync": sync_tree(artifact_dir, drive_repo / "fiorellia-runs" / "blitz_delivery_latest"),
+        "release_sync": sync_tree(release_dir, drive_repo / "releases" / "blitz_release_latest"),
+    }
+
+
 def output_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     errors = [row for row in rows if row.get("error")]
     empty = [row for row in rows if not str(row.get("model_answer") or "").strip()]
@@ -602,6 +644,30 @@ def launch_gradio(adapter_dir: Path, artifact_dir: Path, max_new_tokens: int) ->
 
 def main() -> int:
     print(f"Fiorell.IA Blitz script version: {BLITZ_SCRIPT_VERSION}")
+    try:
+        return main_impl()
+    except json.JSONDecodeError as exc:
+        artifact_dir = Path("/content/fiorellia-runs/blitz_delivery_latest") if Path("/content").exists() else default_artifact_dir()
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        trace_path = artifact_dir / "uncaught_jsondecode_traceback.txt"
+        payload_path = artifact_dir / "uncaught_jsondecode.json"
+        trace = traceback.format_exc()
+        trace_path.write_text(trace, encoding="utf-8")
+        write_json(
+            {
+                "error": str(exc),
+                "script_version": BLITZ_SCRIPT_VERSION,
+                "argv": sys.argv,
+                "traceback": trace,
+            },
+            payload_path,
+        )
+        print(f"BLOCCANTE JSONDecodeError intercettato: trace={trace_path} payload={payload_path}")
+        print(trace)
+        return 1
+
+
+def main_impl() -> int:
     parser = argparse.ArgumentParser(description="Fiorell.IA Blitz Perfection: fast A100 recovery run.")
     parser.add_argument("--artifact-dir", type=Path, default=None)
     parser.add_argument("--release-dir", type=Path, default=None)
@@ -621,12 +687,18 @@ def main() -> int:
     parser.add_argument("--launch-gradio", action="store_true")
     parser.add_argument("--copy-verdict-to-repo", action="store_true")
     parser.add_argument("--reuse-existing-adapter", action="store_true")
+    parser.add_argument("--local-first", action="store_true")
+    parser.add_argument("--sync-to-drive", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     mount_drive_if_colab()
-    artifact_dir = (args.artifact_dir or default_artifact_dir()).resolve()
-    release_dir = (args.release_dir or default_release_dir()).resolve()
+    if args.local_first and Path("/content").exists():
+        artifact_dir = (args.artifact_dir or local_first_artifact_dir()).resolve()
+        release_dir = (args.release_dir or local_first_release_dir()).resolve()
+    else:
+        artifact_dir = (args.artifact_dir or default_artifact_dir()).resolve()
+        release_dir = (args.release_dir or default_release_dir()).resolve()
     reports_dir = artifact_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     release_dir.mkdir(parents=True, exist_ok=True)
@@ -675,6 +747,7 @@ def main() -> int:
                 adapter_zip,
                 release_dir / f"{args.final_name}.zip",
                 artifact_dir / f"{args.final_name}.zip",
+                *drive_blitz_zip_candidates(args.final_name),
             ],
         )
         validate_adapter_dir(adapter_dir)
@@ -766,7 +839,15 @@ def main() -> int:
         if source.exists():
             shutil.copy2(source, release_dir / name)
     summary["release_manifest"] = release_manifest
+    if args.sync_to_drive:
+        summary["drive_sync"] = sync_local_outputs_to_drive(artifact_dir, release_dir)
     write_json(summary, artifact_dir / "blitz_summary.json")
+    if args.sync_to_drive:
+        drive_repo = drive_repo_root()
+        if drive_repo is not None:
+            drive_artifact_dir = drive_repo / "fiorellia-runs" / "blitz_delivery_latest"
+            drive_artifact_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(artifact_dir / "blitz_summary.json", drive_artifact_dir / "blitz_summary.json")
     print(json.dumps(summary, indent=2, ensure_ascii=False))
     if args.launch_gradio and verdict == "GO CON RISERVA":
         return launch_gradio(adapter_dir, artifact_dir, max_new_tokens=args.max_new_tokens)
