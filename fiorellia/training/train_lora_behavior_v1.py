@@ -256,6 +256,9 @@ def load_model(config: dict[str, Any]) -> AutoModelForCausalLM:
         "torch_dtype": dtype,
         "low_cpu_mem_usage": True,
     }
+    attn_implementation = config.get("attn_implementation")
+    if attn_implementation and has_cuda:
+        model_kwargs["attn_implementation"] = str(attn_implementation)
 
     use_4bit = False
     if config.get("use_4bit", False) and has_cuda:
@@ -276,7 +279,15 @@ def load_model(config: dict[str, Any]) -> AutoModelForCausalLM:
     elif config.get("use_4bit", False):
         print("4-bit loading skipped: CUDA is not available on this machine.")
 
-    model = AutoModelForCausalLM.from_pretrained(config["base_model_name"], **model_kwargs)
+    try:
+        model = AutoModelForCausalLM.from_pretrained(config["base_model_name"], **model_kwargs)
+    except (ImportError, ValueError, RuntimeError) as exc:
+        if model_kwargs.get("attn_implementation") == "flash_attention_2":
+            print(f"flash_attention_2 unavailable, retrying with sdpa: {exc}")
+            model_kwargs["attn_implementation"] = "sdpa"
+            model = AutoModelForCausalLM.from_pretrained(config["base_model_name"], **model_kwargs)
+        else:
+            raise
     if has_mps and allow_mps and not use_4bit:
         try:
             model = model.to("mps")

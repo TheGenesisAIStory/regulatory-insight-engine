@@ -108,6 +108,20 @@ python fiorellia_gold_rescore_existing.py --copy-verdict-to-repo
 
 This does not train again. It reloads `fiorellia-runs/final_delivery_latest/reports/adapter_eval.jsonl`, applies the current source-citation parser, rewrites `metrics_summary.json`, `adapter_eval_scored.jsonl`, `comparison.csv`, `final_perfection_summary.json`, `final_verdict_master.md`, and refreshes `releases/gold_release_latest/`.
 
+## Blitz Recovery Notebook
+
+Use `fiorellia_blitz_perfection.ipynb` when the Colab A100 runtime keeps disconnecting before a full Gold run finishes. The Blitz path:
+
+- rebuilds the Gold dataset if the grounded repair examples are missing;
+- trains only 3 epochs;
+- starts from `per_device_train_batch_size=4` and retries with smaller batches if needed;
+- requests Flash Attention 2 and falls back to SDPA if the runtime cannot load it;
+- evaluates a 10-case critical subset instead of the full release gate;
+- writes artifacts to `/content/drive/MyDrive/regulatory-insight-engine/fiorellia-runs/blitz_delivery_latest/`;
+- can open Gradio automatically after a positive relaxed gate.
+
+Blitz output is intentionally labeled `GO CON RISERVA`. It is a fast recovery/demo gate, not a replacement for `GO DEFINITIVO`.
+
 ## Permanent Repo Fixes
 
 The repo includes Colab-stable aliases so manual `touch`, `cp`, or symlink workarounds are no longer needed:

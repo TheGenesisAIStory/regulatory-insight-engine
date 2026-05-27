@@ -86,6 +86,18 @@ fiorellia/training/configs/config_lora_behavior_20260527_final_perfection.yaml
 
 Il prossimo run Colab produce un adapter versionato `fiorellia_behavior_FINAL_PERFECTION_20260527` senza sovrascrivere gli artefatti precedenti.
 
+Modalità rapida per runtime Colab instabili:
+
+```text
+fiorellia_blitz_perfection.ipynb
+fiorellia_blitz_perfection.py
+```
+
+La modalità Blitz usa 3 epoche, batch A100 più alto, eval critica ridotta e salva gli
+artefatti in `fiorellia-runs/blitz_delivery_latest/` e `releases/blitz_release_latest/`.
+Il suo esito positivo è `GO CON RISERVA`: per `GO DEFINITIVO` resta necessaria la
+certificazione Gold completa.
+
 ---
 
 ## Percorso consigliato per utenti non tecnici

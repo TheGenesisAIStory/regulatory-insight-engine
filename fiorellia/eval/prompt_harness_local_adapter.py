@@ -97,18 +97,42 @@ def load_model_and_tokenizer(
     base_model_name: str,
     device: str,
     dtype: torch.dtype,
+    use_4bit: bool,
+    attn_implementation: str | None,
 ) -> tuple[AutoTokenizer, PeftModel]:
     tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model_name,
-        torch_dtype=dtype,
-        low_cpu_mem_usage=True,
-    )
+    model_kwargs: dict[str, Any] = {
+        "torch_dtype": dtype,
+        "low_cpu_mem_usage": True,
+    }
+    if attn_implementation and device == "cuda":
+        model_kwargs["attn_implementation"] = attn_implementation
+    if use_4bit and device == "cuda":
+        from transformers import BitsAndBytesConfig
+
+        model_kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+        )
+        model_kwargs["device_map"] = "auto"
+
+    try:
+        model = AutoModelForCausalLM.from_pretrained(base_model_name, **model_kwargs)
+    except (ImportError, ValueError, RuntimeError) as exc:
+        if model_kwargs.get("attn_implementation") == "flash_attention_2":
+            print(f"flash_attention_2 unavailable for eval, retrying with sdpa: {exc}")
+            model_kwargs["attn_implementation"] = "sdpa"
+            model = AutoModelForCausalLM.from_pretrained(base_model_name, **model_kwargs)
+        else:
+            raise
     model = PeftModel.from_pretrained(model, adapter_path)
-    model.to(device)
+    if "device_map" not in model_kwargs:
+        model.to(device)
     model.eval()
     return tokenizer, model
 
@@ -150,6 +174,8 @@ def main() -> int:
     parser.add_argument("--max-new-tokens", type=int, default=160)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--force-cpu", action="store_true")
+    parser.add_argument("--use-4bit", action="store_true")
+    parser.add_argument("--attn-implementation", default=None)
     args = parser.parse_args()
 
     adapter_config = json.loads((args.adapter_path / "adapter_config.json").read_text(encoding="utf-8"))
@@ -171,13 +197,27 @@ def main() -> int:
     print(f"records={len(records)}")
 
     try:
-        tokenizer, model = load_model_and_tokenizer(args.adapter_path, base_model, device, dtype)
+        tokenizer, model = load_model_and_tokenizer(
+            args.adapter_path,
+            base_model,
+            device,
+            dtype,
+            use_4bit=args.use_4bit,
+            attn_implementation=args.attn_implementation,
+        )
     except RuntimeError as exc:
         if device == "mps" and not args.force_cpu and is_mps_oom(exc):
             print("mps_oom_detected=true")
             print("fallback_device=cpu")
             device, dtype = "cpu", torch.float32
-            tokenizer, model = load_model_and_tokenizer(args.adapter_path, base_model, device, dtype)
+            tokenizer, model = load_model_and_tokenizer(
+                args.adapter_path,
+                base_model,
+                device,
+                dtype,
+                use_4bit=False,
+                attn_implementation=None,
+            )
         else:
             raise
     run_id = datetime.now(timezone.utc).strftime("prompt-harness-local-adapter-%Y%m%dT%H%M%SZ")

@@ -100,6 +100,7 @@ if str(REPO_ROOT) not in sys.path:
 ensure_file("fiorellia_colab_cell04_hotfix.py", "Runner mount guard verified")
 ensure_file("fiorellia/training/final_colab_certification.py", "Drive already available, skipping mount.")
 ensure_file("final_perfection_run.py", "grounded_recovery_cases")
+ensure_file("fiorellia_blitz_perfection.py", "Fiorell.IA Blitz Perfection")
 ensure_file("fiorellia_gold_zero_touch.py", "inject-grounded-repairs")
 ensure_file("fiorellia_gold_rescore_existing.py", "Rescore an existing Fiorell.IA Gold eval")
 ensure_file("fiorellia/training/train_lora_behavior_v1.py", "weight_decay")
