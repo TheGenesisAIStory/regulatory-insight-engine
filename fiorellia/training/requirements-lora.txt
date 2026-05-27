@@ -10,3 +10,6 @@ pyyaml>=6.0
 
 # Optional for CUDA QLoRA / 4-bit loading where supported:
 # bitsandbytes
+
+# Optional Apple Silicon experimental path:
+# mlx-lm

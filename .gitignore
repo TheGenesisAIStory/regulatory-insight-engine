@@ -33,6 +33,7 @@ training/data/output/
 lockfile-backup-*/
 .artifacts/
 artifacts/
+local_runs/
 azure_deploy_summary.json
 fiorellia_app_history.jsonl
 history_export_*.json

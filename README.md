@@ -110,6 +110,18 @@ releases/blitz_release_latest/
 Il suo esito positivo è `GO CON RISERVA`: per `GO DEFINITIVO` resta necessaria la
 certificazione Gold completa.
 
+Fallback locale Mac quando Colab continua a disconnettersi:
+
+```text
+mac_master_train.py
+docs/FIORELLIA_MAC_MPS_RUNBOOK.md
+```
+
+Il runner Mac usa PyTorch MPS su Apple Silicon, disabilita il 4-bit CUDA-only,
+salva adapter e ZIP in `local_runs/`, e può usare una modalità MLX sperimentale
+solo se `mlx-lm` è installato. Questo percorso è pensato per completare training
+stabile in locale, poi riportare su Drive solo gli artefatti finali utili.
+
 ---
 
 ## Percorso consigliato per utenti non tecnici

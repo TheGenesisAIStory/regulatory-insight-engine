@@ -251,7 +251,12 @@ def load_model(config: dict[str, Any]) -> AutoModelForCausalLM:
     has_cuda = torch.cuda.is_available()
     has_mps = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
     allow_mps = bool(config.get("allow_mps", False))
-    dtype = torch.bfloat16 if has_cuda else torch.float32
+    if has_cuda:
+        dtype = torch.bfloat16
+    elif has_mps and allow_mps and bool(config.get("mps_float16", True)):
+        dtype = torch.float16
+    else:
+        dtype = torch.float32
     model_kwargs: dict[str, Any] = {
         "torch_dtype": dtype,
         "low_cpu_mem_usage": True,
@@ -277,7 +282,7 @@ def load_model(config: dict[str, Any]) -> AutoModelForCausalLM:
         except Exception as exc:
             print(f"4-bit loading unavailable, continuing without quantization: {exc}")
     elif config.get("use_4bit", False):
-        print("4-bit loading skipped: CUDA is not available on this machine.")
+        print("4-bit loading skipped: bitsandbytes 4-bit is only enabled for CUDA in this trainer.")
 
     try:
         model = AutoModelForCausalLM.from_pretrained(config["base_model_name"], **model_kwargs)
@@ -291,7 +296,7 @@ def load_model(config: dict[str, Any]) -> AutoModelForCausalLM:
     if has_mps and allow_mps and not use_4bit:
         try:
             model = model.to("mps")
-            print("MPS enabled: model moved to mps.")
+            print(f"MPS enabled: model moved to mps with dtype={dtype}.")
         except RuntimeError as exc:
             print(f"MPS move failed, falling back to CPU: {exc}")
             model = model.to("cpu")
@@ -372,6 +377,9 @@ def main() -> int:
     if not has_cuda and not allow_mps:
         model = model.to("cpu")
         print("CPU device guard: CUDA unavailable and allow_mps=false, keeping PEFT model on CPU.")
+    elif not has_cuda and allow_mps and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        model = model.to("mps")
+        print("PEFT model device guard: MPS active after LoRA wrapping.")
     model.print_trainable_parameters()
 
     if not has_cuda and not allow_mps:
@@ -409,6 +417,9 @@ def main() -> int:
             training_kwargs["no_cuda"] = True
         if "use_mps_device" in training_signature.parameters:
             training_kwargs["use_mps_device"] = False
+    elif not has_cuda and allow_mps and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        if "use_mps_device" in training_signature.parameters:
+            training_kwargs["use_mps_device"] = True
     if "eval_strategy" in training_signature.parameters:
         training_kwargs["eval_strategy"] = eval_value
     else:
