@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -305,6 +306,43 @@ def run_training_blitz(
     raise RuntimeError(f"BLOCCANTE: Blitz training failed after retries: {attempts}")
 
 
+def restore_adapter_from_zip(adapter_dir: Path, candidates: list[Path]) -> dict[str, Any]:
+    if adapter_dir.exists():
+        return {"restored": False, "reason": "adapter_dir_exists", "adapter_dir": str(adapter_dir)}
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        adapter_dir.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(candidate) as zf:
+            corrupt = zf.testzip()
+            if corrupt:
+                shutil.rmtree(adapter_dir, ignore_errors=True)
+                raise RuntimeError(f"BLOCCANTE: adapter zip corrotto: {candidate} member={corrupt}")
+            zf.extractall(adapter_dir)
+        try:
+            validate_adapter_dir(adapter_dir)
+        except RuntimeError:
+            nested = [
+                path
+                for path in adapter_dir.iterdir()
+                if path.is_dir() and (path / "adapter_config.json").exists()
+            ]
+            if len(nested) == 1:
+                tmp_dir = adapter_dir.with_name(f"{adapter_dir.name}_extract_tmp")
+                if tmp_dir.exists():
+                    shutil.rmtree(tmp_dir)
+                nested[0].rename(tmp_dir)
+                shutil.rmtree(adapter_dir)
+                tmp_dir.rename(adapter_dir)
+            validate_adapter_dir(adapter_dir)
+        return {"restored": True, "adapter_dir": str(adapter_dir), "source_zip": str(candidate)}
+    raise RuntimeError(
+        "BLOCCANTE: adapter locale assente e nessuno ZIP Blitz trovato su Drive. "
+        f"Cercati: {[str(path) for path in candidates]}. "
+        "Rilancia il Blitz completo senza --reuse-existing-adapter."
+    )
+
+
 def output_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     errors = [row for row in rows if row.get("error")]
     empty = [row for row in rows if not str(row.get("model_answer") or "").strip()]
@@ -507,11 +545,20 @@ def main() -> int:
         print(json.dumps(preflight, indent=2, ensure_ascii=False))
         return 0
     if args.reuse_existing_adapter:
+        restore_info = restore_adapter_from_zip(
+            adapter_dir,
+            [
+                adapter_zip,
+                release_dir / f"{args.final_name}.zip",
+                artifact_dir / f"{args.final_name}.zip",
+            ],
+        )
         validate_adapter_dir(adapter_dir)
         training = {
             "ok": True,
             "reused_existing_adapter": True,
             "adapter_dir": str(adapter_dir),
+            "restore_info": restore_info,
             "note": "Training skipped by --reuse-existing-adapter; running stabilized Blitz evaluation only.",
         }
         write_json(training, artifact_dir / "blitz_training_attempts.json")
